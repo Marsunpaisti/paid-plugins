@@ -23,11 +23,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-rootProject.name = "Paisti Plugins"
+rootProject.name = "Paid Paisti Plugins"
 
-include(":paistisuite")
-include(":webwalker")
-include(":aiofighter")
+include(":aiofighterpro")
 
 for (project in rootProject.children) {
     project.apply {
