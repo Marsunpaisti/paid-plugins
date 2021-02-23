@@ -1,7 +1,7 @@
-version = "1.1.1"
+version = "1.0.0"
 
-project.extra["PluginName"] = "AiO Fighter Pro"
-project.extra["PluginDescription"] = "PRO VERSION - Fully configurable all-in-one fighter"
+project.extra["PluginName"] = "PQuester"
+project.extra["PluginDescription"] = "Completes quests"
 
 dependencies {
     annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.12")

@@ -25,7 +25,8 @@
 
 rootProject.name = "Paid Paisti Plugins"
 
-include(":aiofighterpro")
+include(":pquester")
+include(":pfighteraio")
 
 for (project in rootProject.children) {
     project.apply {
