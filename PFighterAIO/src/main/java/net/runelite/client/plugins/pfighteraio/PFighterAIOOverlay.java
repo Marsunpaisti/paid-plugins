@@ -9,6 +9,7 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.plugins.paistisuite.api.PGroundItems;
 import net.runelite.client.plugins.paistisuite.api.PUtils;
+import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.WebWalkerDebugRenderer;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.ui.overlay.*;
 import javax.inject.Inject;
@@ -45,6 +46,7 @@ public class PFighterAIOOverlay extends Overlay
 	{
 		if (!config.enableOverlay()) return null;
 
+		/*
 		List<PGroundItem> loot = PGroundItems.getGroundItems();
 		for (PGroundItem i : loot){
 			if (i.getSpawnTime() == null) continue;
@@ -55,7 +57,9 @@ public class PFighterAIOOverlay extends Overlay
 			if (p == null || p.getBounds() == null) continue;
 			Point center = new Point((int)p.getBounds().getCenterX(), (int)p.getBounds().getCenterY());
 			OverlayUtil.renderTextLocation(graphics, center, "" + i.getPricePerSlot(), Color.green);
-		}
+		}*/
+
+		WebWalkerDebugRenderer.render(graphics);
 
 		if (plugin.searchRadiusCenter != null){
 			drawTile(graphics, plugin.searchRadiusCenter, new Color(66, 254, 254, 35), new Color(66, 254, 254, 120));

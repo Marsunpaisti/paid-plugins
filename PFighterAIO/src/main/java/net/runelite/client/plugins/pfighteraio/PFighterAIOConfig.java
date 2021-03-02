@@ -251,6 +251,63 @@ public interface PFighterAIOConfig extends Config
         return false;
     }
 
+    @ConfigSection(
+            name = "Banking",
+            description = "Banking options",
+            position = 84,
+            closedByDefault = true,
+            keyName = "bankingSection"
+    )
+    String bankingSection = "Banking";
+
+    @ConfigItem(
+            keyName = "enableBanking",
+            name = "Enable banking",
+            description = "Enable banking",
+            section = bankingSection,
+            position = 85
+    )
+    default boolean enableBanking()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "bankForFood",
+            name = "Bank when out of food",
+            description = "Bank when out of food",
+            section = bankingSection,
+            position = 86
+    )
+    default boolean bankForFood()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "bankForLoot",
+            name = "Bank when inventory is full",
+            description = "Bank when inventory is full",
+            section = bankingSection,
+            position = 86
+    )
+    default boolean bankForLoot()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "withdrawItems",
+            name = "Withdraw items list",
+            description = "Items to withdraw when banking",
+            section = bankingSection,
+            position = 88
+    )
+    default String withdrawItems()
+    {
+        return "";
+    }
+
     @ConfigItem(
             keyName = "startButton",
             name = "Start",

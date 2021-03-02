@@ -16,20 +16,20 @@ import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.WalkingCondition;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
+import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.Keyboard;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
-import net.runelite.client.plugins.pfighteraio.states.FightEnemiesState;
-import net.runelite.client.plugins.pfighteraio.states.LootItemsState;
-import net.runelite.client.plugins.pfighteraio.states.State;
-import net.runelite.client.plugins.pfighteraio.states.WalkToFightAreaState;
+import net.runelite.client.plugins.pfighteraio.states.*;
 import net.runelite.client.ui.overlay.OverlayManager;
 import org.pf4j.Extension;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.awt.event.KeyEvent;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -70,12 +70,19 @@ public class PFighterAIO extends PScript {
     public boolean safeSpotForCombat;
     public boolean safeSpotForLogout;
     public boolean forceLoot;
+    public boolean bankingEnabled;
+    public boolean bankForFood;
+    public boolean bankForLoot;
+    public List<BankingState.WithdrawItem> itemsToWithdraw;
     State currentState;
     List<State> states = new ArrayList<State>();
-    public FightEnemiesState fightEnemiesState = new FightEnemiesState(this);
-    public LootItemsState lootItemsState = new LootItemsState(this);
-    public WalkToFightAreaState walkToFightAreaState = new WalkToFightAreaState(this);
+    public FightEnemiesState fightEnemiesState;
+    public LootItemsState lootItemsState;
+    public WalkToFightAreaState walkToFightAreaState;
+    public BankingState bankingState;
     private String currentStateName;
+    private long lastAntiAfk = System.currentTimeMillis();
+    private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
 
     @Inject
     private PFighterAIOConfig config;
@@ -115,6 +122,11 @@ public class PFighterAIO extends PScript {
     @Override
     protected synchronized void onStart() {
         PUtils.sendGameMessage("AiO Fighter started!");
+        fightEnemiesState = new FightEnemiesState(this);
+        lootItemsState = new LootItemsState(this);
+        walkToFightAreaState = new WalkToFightAreaState(this);
+        bankingState = new BankingState(this);
+
         startedTimestamp = Instant.now();
         readConfig();
         if (usingSavedSafeSpot){
@@ -124,31 +136,59 @@ public class PFighterAIO extends PScript {
             PUtils.sendGameMessage("Loaded fight area from last config.");
         }
         DaxWalker.setCredentials(PaistiSuite.getDaxCredentialsProvider());
-        DaxWalker.getInstance().allowTeleports = false;
+        DaxWalker.getInstance().allowTeleports = true;
+        states.add(this.bankingState);
         states.add(this.lootItemsState);
         states.add(this.fightEnemiesState);
         states.add(this.walkToFightAreaState);
     }
 
     private synchronized void readConfig(){
+        // Targeting & tiles
         searchRadius = config.searchRadius();
-        stopWhenOutOfFood = config.stopWhenOutOfFood();
-        eatFoodForLoot = config.eatForLoot();
         enemiesToTarget = PUtils.parseCommaSeparated(config.enemyNames());
-        foodsToEat = PUtils.parseCommaSeparated(config.foodNames());
-        lootNames = PUtils.parseCommaSeparated(config.lootNames());
-        maxEatHp = Math.min(PSkills.getActualLevel(Skill.HITPOINTS), config.maxEatHP());
-        minEatHp = Math.min(config.minEatHP(), maxEatHp);
-        nextEatAt = (int)PUtils.randomNormal(minEatHp, maxEatHp);
-        validTargetFilter = createValidTargetFilter(false);
-        validTargetFilterWithoutDistance = createValidTargetFilter(true);
-        validLootFilter = createValidLootFilter();
-        validFoodFilter = createValidFoodFilter();
-        lootGEValue = config.lootGEValue();
         safeSpotForCombat = config.enableSafeSpot();
         safeSpotForLogout = config.exitInSafeSpot();
         enablePathfind = config.enablePathfind();
+        validTargetFilter = createValidTargetFilter(false);
+        validTargetFilterWithoutDistance = createValidTargetFilter(true);
+
+        // Eating
+        foodsToEat = PUtils.parseCommaSeparated(config.foodNames());
+        validFoodFilter = createValidFoodFilter();
+        maxEatHp = Math.min(PSkills.getActualLevel(Skill.HITPOINTS), config.maxEatHP());
+        minEatHp = Math.min(config.minEatHP(), maxEatHp);
+        nextEatAt = (int)PUtils.randomNormal(minEatHp, maxEatHp);
+        stopWhenOutOfFood = config.stopWhenOutOfFood();
+
+        // Looting
+        lootNames = PUtils.parseCommaSeparated(config.lootNames());
+        eatFoodForLoot = config.eatForLoot();
         forceLoot = config.forceLoot();
+        lootGEValue = config.lootGEValue();
+        validLootFilter = createValidLootFilter();
+
+        // Banking
+        bankForFood = config.bankForFood();
+        bankForLoot = config.bankForLoot();
+        bankingEnabled = config.enableBanking();
+        try {
+            itemsToWithdraw = new ArrayList<BankingState.WithdrawItem>();
+            String[] split = PUtils.parseNewlineSeparated(config.withdrawItems());
+            Arrays.stream(split).forEach(s -> log.info("Row: " + s));
+            for (String s : split){
+                if (s.length() <= 0) continue;
+                String[] parts = s.split(":");
+                String nameOrId = parts[0];
+                int quantity = Integer.parseInt(parts[1].strip());
+                itemsToWithdraw.add(new BankingState.WithdrawItem(nameOrId, quantity));
+            }
+        } catch (Exception e){
+            PUtils.sendGameMessage("Error when trying to read withdraw items list");
+        }
+
+
+        // Stored tiles
         if (safeSpot == null){
             usingSavedSafeSpot = true;
             safeSpot = config.storedSafeSpotTile();
@@ -195,6 +235,7 @@ public class PFighterAIO extends PScript {
         if (isStopRequested()) return;
         handleRun();
         if (isStopRequested()) return;
+        handleAntiAfk();
 
         State prevState = currentState;
         currentState = getValidState();
@@ -209,28 +250,61 @@ public class PFighterAIO extends PScript {
         }
     }
 
+    private void handleAntiAfk(){
+        if (System.currentTimeMillis() - lastAntiAfk >= antiAfkDelay) {
+            lastAntiAfk = System.currentTimeMillis();
+            antiAfkDelay = PUtils.randomNormal(240000, 295000);
+            Keyboard.typeKeysInt(KeyEvent.VK_BACK_SPACE);
+            PUtils.sleepNormal(100, 200);
+        }
+    }
+
+    private boolean executeStop(){
+        if (PBanking.isBankOpen() || PBanking.isDepositBoxOpen()) {
+            PBanking.closeBank();
+            PUtils.sleepNormal(700, 1500);
+        }
+
+        if (safeSpotForLogout && PPlayer.location().distanceTo(safeSpot) != 0 && PPlayer.distanceTo(safeSpot) <= 45) {
+            if (!PWalking.sceneWalk(safeSpot)) {
+                DaxWalker.getInstance().allowTeleports = false;
+                DaxWalker.walkTo(new RSTile(safeSpot), walkingCondition);
+            }
+
+            return true;
+        }
+
+        if (!fightEnemiesState.inCombat()){
+            PUtils.logout();
+            if  (PUtils.waitCondition(1500, () -> PUtils.getClient().getGameState() != GameState.LOGGED_IN)) {
+                requestStop();
+            } else {
+                PUtils.sleepNormal(700, 2500);
+            }
+            return true;
+        } else if (fightEnemiesState.inCombat()){
+            PUtils.sleepNormal(700, 1500);
+            return true;
+        }
+
+        return false;
+    }
+
     private boolean handleStopConditions(){
         if (stopWhenOutOfFood && PInventory.findItem(validFoodFilter) == null) {
-            setCurrentStateName("Stop Condition");
-            if (safeSpotForLogout && PPlayer.location().distanceTo(safeSpot) != 0) {
-                if (!PWalking.sceneWalk(safeSpot)) {
-                    DaxWalker.getInstance().allowTeleports = false;
-                    DaxWalker.walkTo(new RSTile(safeSpot), walkingCondition);
-                }
-                return true;
-            }
-            if (!fightEnemiesState.inCombat()){
-                PUtils.logout();
-                if  (PUtils.waitCondition(1500, () -> PUtils.getClient().getGameState() != GameState.LOGGED_IN)) {
-                    requestStop();
-                } else {
-                    PUtils.sleepNormal(700, 2500);
-                }
-                return true;
-            } else if (fightEnemiesState.inCombat()){
-                return true;
-            }
+            log.info("Stopping. No food remaining.");
+            setCurrentStateName("Stopping. No food remaining.");
+            executeStop();
+            return true;
         }
+
+        if (this.bankingState.bankingFailure){
+            log.info("Stopping. Banking failed.");
+            setCurrentStateName("Stopping. Banking failed.");
+            executeStop();
+            return true;
+        }
+
         return false;
     }
 
