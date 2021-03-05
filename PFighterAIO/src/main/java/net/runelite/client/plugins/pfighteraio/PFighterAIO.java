@@ -31,6 +31,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -55,6 +57,7 @@ public class PFighterAIO extends PScript {
     public int minEatHp;
     public int maxEatHp;
     public int searchRadius;
+    public int reservedInventorySlots;
     public WorldPoint safeSpot;
     public WorldPoint searchRadiusCenter;
     public String[] enemiesToTarget;
@@ -73,16 +76,27 @@ public class PFighterAIO extends PScript {
     public boolean bankingEnabled;
     public boolean bankForFood;
     public boolean bankForLoot;
+    public boolean teleportWhileBanking;
+    private String apiKey;
     public List<BankingState.WithdrawItem> itemsToWithdraw;
     State currentState;
-    List<State> states = new ArrayList<State>();
+    List<State> states;
     public FightEnemiesState fightEnemiesState;
     public LootItemsState lootItemsState;
     public WalkToFightAreaState walkToFightAreaState;
     public BankingState bankingState;
+    public TakeBreaksState takeBreaksState;
     private String currentStateName;
     private long lastAntiAfk = System.currentTimeMillis();
     private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
+    public PBreakScheduler breakScheduler = null;
+    public boolean safeSpotForBreaks;
+    public boolean enableBreaks;
+    private int breakMinIntervalMinutes;
+    private int breakMaxIntervalMinutes;
+    private int breakMinDurationSeconds;
+    private int breakMaxDurationSeconds;
+
 
     @Inject
     private PFighterAIOConfig config;
@@ -94,7 +108,8 @@ public class PFighterAIO extends PScript {
     private PFighterAIOOverlayMinimap minimapoverlay;
     @Inject
     private ConfigManager configManager;
-
+    private LicenseValidator licenseValidator;
+    private ExecutorService validatorExecutor;
 
     @Provides
     PFighterAIOConfig provideConfig(ConfigManager configManager)
@@ -122,13 +137,15 @@ public class PFighterAIO extends PScript {
     @Override
     protected synchronized void onStart() {
         PUtils.sendGameMessage("AiO Fighter started!");
+        readConfig();
+        breakScheduler = new PBreakScheduler(breakMinIntervalMinutes, breakMaxIntervalMinutes, breakMinDurationSeconds, breakMaxDurationSeconds);
         fightEnemiesState = new FightEnemiesState(this);
         lootItemsState = new LootItemsState(this);
         walkToFightAreaState = new WalkToFightAreaState(this);
         bankingState = new BankingState(this);
+        takeBreaksState = new TakeBreaksState(this);
 
         startedTimestamp = Instant.now();
-        readConfig();
         if (usingSavedSafeSpot){
             PUtils.sendGameMessage("Loaded safespot from last config.");
         }
@@ -137,10 +154,20 @@ public class PFighterAIO extends PScript {
         }
         DaxWalker.setCredentials(PaistiSuite.getDaxCredentialsProvider());
         DaxWalker.getInstance().allowTeleports = true;
+        states = new ArrayList<State>();
         states.add(this.bankingState);
+        states.add(this.takeBreaksState);
         states.add(this.lootItemsState);
         states.add(this.fightEnemiesState);
         states.add(this.walkToFightAreaState);
+        currentState = null;
+        currentStateName = null;
+
+        licenseValidator = new LicenseValidator("PFIGHTERAIO", 600, apiKey);
+        validatorExecutor = Executors.newSingleThreadExecutor();
+        validatorExecutor.submit(() -> {
+            licenseValidator.startValidating();
+        });
     }
 
     private synchronized void readConfig(){
@@ -167,11 +194,13 @@ public class PFighterAIO extends PScript {
         forceLoot = config.forceLoot();
         lootGEValue = config.lootGEValue();
         validLootFilter = createValidLootFilter();
+        reservedInventorySlots = 0;
 
         // Banking
         bankForFood = config.bankForFood();
         bankForLoot = config.bankForLoot();
         bankingEnabled = config.enableBanking();
+        teleportWhileBanking = config.teleportWhileBanking();
         try {
             itemsToWithdraw = new ArrayList<BankingState.WithdrawItem>();
             String[] split = PUtils.parseNewlineSeparated(config.withdrawItems());
@@ -198,6 +227,17 @@ public class PFighterAIO extends PScript {
             searchRadiusCenter = config.storedFightTile();
         }
 
+        // Breaks
+        enableBreaks = config.enableBreaks();
+        safeSpotForBreaks = config.safeSpotForBreaks();
+        breakMinIntervalMinutes = config.minBreakIntervalMinutes();
+        breakMaxIntervalMinutes = Math.max(config.maxBreakIntervalMinutes(), breakMinIntervalMinutes);
+        breakMinDurationSeconds = config.minBreakDurationSeconds();
+        breakMaxDurationSeconds = Math.max(config.maxBreakDurationSeconds(), breakMinDurationSeconds);
+
+        // Licensing
+        apiKey = config.apiKey();
+
         log.info("Targeting enemies: " + String.join(", ", enemiesToTarget));
         log.info("Food names: " + String.join(", ", foodsToEat));
         log.info("Loot names: " + String.join(", ", lootNames));
@@ -210,11 +250,13 @@ public class PFighterAIO extends PScript {
         PUtils.sendGameMessage("AiO Fighter stopped!");
         searchRadiusCenter = null;
         safeSpot = null;
+        licenseValidator.requestStop();
     }
 
     @Override
     protected void shutDown() {
         requestStop();
+        licenseValidator.requestStop();
         overlayManager.remove(overlay);
         overlayManager.remove(minimapoverlay);
     }
@@ -226,10 +268,22 @@ public class PFighterAIO extends PScript {
         return null;
     }
 
+    private boolean checkValidator(){
+        if (!licenseValidator.isValid() && !fightEnemiesState.inCombat()) {
+            log.info(licenseValidator.getLastError());
+            PUtils.sendGameMessage(licenseValidator.getLastError());
+            requestStop();
+            return false;
+        }
+        return true;
+    }
+
     @Override
     protected void loop() {
         PUtils.sleepFlat(50, 150);
         if (PUtils.getClient().getGameState() != GameState.LOGGED_IN) return;
+
+        if(!checkValidator()) return;
         if (handleStopConditions()) return;
         handleEating();
         if (isStopRequested()) return;
@@ -239,6 +293,7 @@ public class PFighterAIO extends PScript {
 
         State prevState = currentState;
         currentState = getValidState();
+        if(!checkValidator()) return;
         if (currentState != null) {
             if (prevState != currentState){
                 log.info("Entered state: " + currentState.getName());

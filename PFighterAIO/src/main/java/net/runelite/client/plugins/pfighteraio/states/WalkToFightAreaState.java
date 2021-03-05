@@ -32,6 +32,7 @@ public class WalkToFightAreaState extends State {
         super.loop();
         WorldPoint target = (plugin.safeSpotForCombat && plugin.safeSpot != null) ? plugin.safeSpot : plugin.searchRadiusCenter;
 
+        DaxWalker.getInstance().allowTeleports = plugin.teleportWhileBanking;
         if (!PPlayer.isMoving()) {
             if (target.isInScene(PUtils.getClient()) && plugin.isReachable(target) && PWalking.sceneWalk(target)){
                 PUtils.sleepNormal(650, 1500);

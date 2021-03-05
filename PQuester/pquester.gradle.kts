@@ -10,6 +10,25 @@ dependencies {
 }
 
 tasks {
+    register<proguard.gradle.ProGuardTask>("proguard") {
+        configuration("${rootProject.projectDir}/config/proguard/proguard.txt")
+
+        injars("${project.buildDir}/libs/${project.name}-${project.version}.jar")
+        outjars("${project.buildDir}/libs/${project.name}-${project.version}-proguard.jar")
+
+        target("11")
+
+        adaptresourcefilenames()
+        adaptresourcefilecontents()
+        optimizationpasses(9)
+        allowaccessmodification()
+        mergeinterfacesaggressively()
+        renamesourcefileattribute("SourceFile")
+        keepattributes("Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod")
+
+        libraryjars(System.getProperty("java.home") + "/jmods")
+        libraryjars(configurations.compileClasspath.get())
+    }
     jar {
         manifest {
             attributes(mapOf(

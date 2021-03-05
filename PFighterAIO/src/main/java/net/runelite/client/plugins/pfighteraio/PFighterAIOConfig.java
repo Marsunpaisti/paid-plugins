@@ -19,7 +19,7 @@ public interface PFighterAIOConfig extends Config
 
     @ConfigSection(
             name = "Targeting",
-            description = "Enter enemy names/ids to target!!!",
+            description = "Enter enemy names/ids to target",
             position = 11,
             closedByDefault = true,
             keyName = "targetingSection"
@@ -29,7 +29,7 @@ public interface PFighterAIOConfig extends Config
     @ConfigItem(
             keyName = "enemyNames",
             name = "",
-            description = "Enter enemy names/ids to target!!!",
+            description = "Enter enemy names/ids to target",
             position = 12,
             title = targetingsection,
             section = targetingsection
@@ -59,13 +59,13 @@ public interface PFighterAIOConfig extends Config
     @ConfigItem(
             keyName = "enablePathfind",
             name = "Check pathfinding",
-            description = "Enable to also check that a valid path to target can be found. May impact performance.",
+            description = "Enable to also check that a valid path to target can be found.",
             section = targetingsection,
             position = 18
     )
     default boolean enablePathfind()
     {
-        return false;
+        return true;
     }
 
     @ConfigItem(
@@ -289,9 +289,21 @@ public interface PFighterAIOConfig extends Config
             name = "Bank when inventory is full",
             description = "Bank when inventory is full",
             section = bankingSection,
-            position = 86
+            position = 87
     )
     default boolean bankForLoot()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "teleportWhileBanking",
+            name = "Use teleports to bank",
+            description = "Uses available teleport items from inventory to get to bank and back",
+            section = bankingSection,
+            position = 88
+    )
+    default boolean teleportWhileBanking()
     {
         return false;
     }
@@ -308,11 +320,106 @@ public interface PFighterAIOConfig extends Config
         return "";
     }
 
+    @ConfigSection(
+            name = "Breaks",
+            description = "Break options",
+            position = 95,
+            closedByDefault = true,
+            keyName = "breakSection"
+    )
+    String breakSection = "Break Options";
+
+    @ConfigItem(
+            keyName = "enableBreaks",
+            name = "Enable breaks",
+            description = "Take breaks on a schedule",
+            section = breakSection,
+            position = 96
+    )
+    default boolean enableBreaks()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "safeSpotForBreaks",
+            name = "Break in safespot",
+            description = "Go to safespot before starting break",
+            section = breakSection,
+            position = 97
+    )
+    default boolean safeSpotForBreaks()
+    {
+        return true;
+    }
+    @ConfigItem(
+            keyName = "minBreakIntervalMinutes",
+            name = "Min Interval (minutes)",
+            description = "Breaks will happen every min - max minutes",
+            section = breakSection,
+            position = 98
+
+    )
+    default int minBreakIntervalMinutes()
+    {
+        return 5;
+    }
+
+    @ConfigItem(
+            keyName = "maxBreakIntervalMinutes",
+            name = "Max Interval (minutes)",
+            description = "Breaks will happen every min - max minutes",
+            section = breakSection,
+            position = 99
+    )
+    default int maxBreakIntervalMinutes()
+    {
+        return 15;
+    }
+
+
+    @ConfigItem(
+            keyName = "minBreakDurationSeconds",
+            name = "Min Duration (seconds)",
+            description = "Breaks will last min - max seconds",
+            section = breakSection,
+            position = 100
+
+    )
+    default int minBreakDurationSeconds()
+    {
+        return 25;
+    }
+
+    @ConfigItem(
+            keyName = "maxBreakDurationSeconds",
+            name = "Max Duration (seconds)",
+            description = "Breaks will last min - max seconds",
+            section = breakSection,
+            position = 101
+    )
+    default int maxBreakDurationSeconds()
+    {
+        return 120;
+    }
+
+
+    @ConfigItem(
+            keyName = "apiKey",
+            name = "API Key",
+            description = "Your secret API/License key",
+            position = 150
+    )
+    default String apiKey()
+    {
+        return "";
+    }
+
     @ConfigItem(
             keyName = "startButton",
             name = "Start",
             description = "Start",
-            position = 101
+            position = 151
     )
     default Button startButton()
     {
@@ -323,7 +430,7 @@ public interface PFighterAIOConfig extends Config
             keyName = "stopButton",
             name = "Stop",
             description = "Stop",
-            position = 102
+            position = 152
     )
     default Button stopButton()
     {

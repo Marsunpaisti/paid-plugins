@@ -67,7 +67,7 @@ public class FightEnemiesState extends State {
 
         // No combat and trying to target timeout check
         if (!inCombat() && isInteracting()){
-            if (System.currentTimeMillis() - targetClickedTimestamp >= 3000 && !PPlayer.isMoving()){
+            if (!isCurrentTargetValid() || (System.currentTimeMillis() - targetClickedTimestamp >= 3000 && !PPlayer.isMoving())){
                 log.info("Stuck trying to target enemy - Trying to attack new target");
                 PUtils.sleepNormal(300, 1500, 250, 400);
                 if (plugin.isStopRequested()) return;
@@ -119,7 +119,7 @@ public class FightEnemiesState extends State {
         List<NPC> targets = plugin.getValidTargets();
         if (targets.size() < 1) return null;
         targets.sort(targetPrioritySorter);
-        if (targets.size() >= 2 && PUtils.random(1,5) <= 1 && !(targets.get(0).getInteracting() != null && targets.get(0).getInteracting().equals(PPlayer.get()))) {
+        if (targets.size() >= 2 && PUtils.random(1,8) <= 1 && !(targets.get(0).getInteracting() != null && targets.get(0).getInteracting().equals(PPlayer.get()))) {
             return targets.get(1);
         }
         return targets.get(0);

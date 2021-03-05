@@ -42,10 +42,9 @@ public class BankingState extends State {
         }
 
         // No inventory space & no food to eat for space -> go bank
-        if (plugin.bankForLoot && PInventory.getEmptySlots() == 0 && (!plugin.eatFoodForLoot || PInventory.findItem(plugin.validFoodFilter) == null)){
+        if (plugin.bankForLoot && PInventory.getEmptySlots() <= plugin.reservedInventorySlots && (!plugin.eatFoodForLoot || PInventory.findItem(plugin.validFoodFilter) == null)){
             shouldBank = true;
         }
-
 
         return shouldBank;
     }
@@ -69,7 +68,7 @@ public class BankingState extends State {
              }
 
              PBanking.depositInventory();
-             PUtils.sleepNormal(300, 600);
+             PUtils.sleepNormal(500, 1500, 100, 800);
              if (!withdrawDesiredInventory()) {
                  bankingFailure = true;
                  return;
@@ -79,6 +78,7 @@ public class BankingState extends State {
              return;
         }
 
+        DaxWalker.getInstance().allowTeleports = plugin.teleportWhileBanking;
         if (!DaxWalker.walkToBank(plugin.walkingCondition)) {
             attempts++;
             return;
@@ -95,7 +95,7 @@ public class BankingState extends State {
                 PUtils.sendGameMessage("Unable to withdraw item: " + i.nameOrId);
                 return false;
             } else {
-                PUtils.sleepNormal(300, 800);
+                PUtils.sleepNormal(300, 1000, 100, 600);
             }
         }
         return true;

@@ -52,7 +52,7 @@ public class LootItemsState extends State {
 
         PGroundItem target = getNextLootableItem();
         if (target != null){
-            if (PInventory.getEmptySlots() == 0 && plugin.eatFoodForLoot){
+            if (PInventory.getEmptySlots() <= plugin.reservedInventorySlots && plugin.eatFoodForLoot){
                 List<PItem> foodItems = PInventory.findAllItems(plugin.validFoodFilter);
                 int quantityBefore = foodItems.size();
                 if (quantityBefore == 0) return;
@@ -72,7 +72,7 @@ public class LootItemsState extends State {
                     PUtils.waitCondition(PUtils.random(1400, 2200), PPlayer::isMoving);
                 }
                 PUtils.waitCondition(PUtils.random(4000, 6000), () -> !PPlayer.isMoving());
-                PUtils.sleepNormal(100, 700);
+                PUtils.sleepNormal(100, 900, 100, 200);
             }
         }
     }
@@ -88,7 +88,7 @@ public class LootItemsState extends State {
     };
 
     public boolean haveSpaceForItem(PGroundItem item){
-        if (PInventory.getEmptySlots() > 0){
+        if (PInventory.getEmptySlots() > plugin.reservedInventorySlots){
             return true;
         }
         if (item.isStackable() && PInventory.findItem(Filters.Items.idEquals(item.getId())) != null){

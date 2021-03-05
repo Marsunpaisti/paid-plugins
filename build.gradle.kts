@@ -2,6 +2,9 @@ buildscript {
     repositories {
         gradlePluginPortal()
     }
+    dependencies {
+        classpath("net.sf.proguard:proguard-gradle:6.2.2")
+    }
 }
 
 plugins {

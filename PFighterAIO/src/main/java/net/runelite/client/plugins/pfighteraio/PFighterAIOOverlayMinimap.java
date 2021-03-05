@@ -53,6 +53,7 @@ public class PFighterAIOOverlayMinimap extends Overlay
 
 	public void renderInfoBox(Graphics2D graphics){
 		if (!plugin.isRunning()) return;
+		if (plugin.startedTimestamp == null) return;
 		Widget base = null;
 		if (PWidgets.isSubstantiated(WidgetInfo.CHATBOX)){
 			base = PWidgets.get(WidgetInfo.CHATBOX_PARENT);
