@@ -5,6 +5,8 @@ import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
 import net.runelite.api.queries.NPCQuery;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -92,10 +94,12 @@ public class PFighterAIO extends PScript {
     public PBreakScheduler breakScheduler = null;
     public boolean safeSpotForBreaks;
     public boolean enableBreaks;
+    private boolean flickQuickPrayers;
     private int breakMinIntervalMinutes;
     private int breakMaxIntervalMinutes;
     private int breakMinDurationSeconds;
     private int breakMaxDurationSeconds;
+    private ExecutorService prayerFlickExecutor;
 
 
     @Inject
@@ -125,6 +129,51 @@ public class PFighterAIO extends PScript {
         }
         overlayManager.add(overlay);
         overlayManager.add(minimapoverlay);
+    }
+
+    public boolean shouldPray() {
+        if (PPlayer.get().getInteracting() != null){
+            if (validTargetFilterWithoutDistance.test((NPC)PPlayer.get().getInteracting())) {
+                return true;
+            }
+        }
+
+        if (PObjects.findNPC(validTargetFilterWithoutDistance.and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
+            return true;
+        }
+
+        return false;
+    }
+
+    @Subscribe
+    private void onGameTick(GameTick event){
+        if (flickQuickPrayers && isRunning() && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
+            if (shouldPray()){
+                if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(50, 275);
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Deactivate");
+                        PUtils.sleepNormal(100, 175);
+                        PInteraction.widget(quickPray, "Activate");
+                    });
+                } else {
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(100, 350);
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Activate");
+                    });
+                }
+            } else {
+                if (PVars.getVarbit(Varbits.QUICK_PRAYER) != 0){
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(100, 350);
+                            Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                            PInteraction.widget(quickPray, "Deactivate");
+                    });
+                }
+            }
+        }
     }
 
     @Subscribe
@@ -234,6 +283,12 @@ public class PFighterAIO extends PScript {
         breakMaxIntervalMinutes = Math.max(config.maxBreakIntervalMinutes(), breakMinIntervalMinutes);
         breakMinDurationSeconds = config.minBreakDurationSeconds();
         breakMaxDurationSeconds = Math.max(config.maxBreakDurationSeconds(), breakMinDurationSeconds);
+
+        // Prayer
+        flickQuickPrayers = config.flickQuickPrayers();
+        if (flickQuickPrayers) {
+            if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
+        }
 
         // Licensing
         apiKey = config.apiKey();

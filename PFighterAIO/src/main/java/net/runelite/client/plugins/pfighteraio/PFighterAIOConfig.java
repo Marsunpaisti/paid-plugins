@@ -321,7 +321,7 @@ public interface PFighterAIOConfig extends Config
     }
 
     @ConfigSection(
-            name = "Breaks",
+            name = "AFK Breaks",
             description = "Break options",
             position = 95,
             closedByDefault = true,
@@ -403,12 +403,31 @@ public interface PFighterAIOConfig extends Config
         return 120;
     }
 
+    @ConfigSection(
+            name = "Prayer",
+            description = "Prayer settings",
+            position = 160,
+            closedByDefault = true,
+            keyName = "prayerSection"
+    )
+    String prayerSection = "Prayer settings";
+    @ConfigItem(
+            keyName = "flickQuickPrayers",
+            name = "Flick quick prayers in combat",
+            description = "Makes bot flick prayers when in combat with targets",
+            section = prayerSection,
+            position = 161
+    )
+    default boolean flickQuickPrayers()
+    {
+        return false;
+    }
 
     @ConfigItem(
             keyName = "apiKey",
             name = "API Key",
             description = "Your secret API/License key",
-            position = 150
+            position = 179
     )
     default String apiKey()
     {
@@ -419,7 +438,7 @@ public interface PFighterAIOConfig extends Config
             keyName = "startButton",
             name = "Start",
             description = "Start",
-            position = 151
+            position = 180
     )
     default Button startButton()
     {
@@ -430,7 +449,7 @@ public interface PFighterAIOConfig extends Config
             keyName = "stopButton",
             name = "Stop",
             description = "Stop",
-            position = 152
+            position = 181
     )
     default Button stopButton()
     {
@@ -442,7 +461,7 @@ public interface PFighterAIOConfig extends Config
             hidden = true,
             name = "Stored fight tile",
             description = "Used to save last used fight tile",
-            position = 103
+            position = 200
     )
     default WorldPoint storedFightTile()
     {
@@ -454,7 +473,7 @@ public interface PFighterAIOConfig extends Config
             hidden = true,
             name = "Stored safe spot tile",
             description = "Used to save last used safe spot tile",
-            position = 104
+            position = 201
     )
     default WorldPoint storedSafeSpotTile()
     {
