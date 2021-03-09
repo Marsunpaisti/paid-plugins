@@ -4,5 +4,6 @@
 -keep class net.runelite.client.plugins.*.*Plugin {void *(java.lang.String);}
 
 -keepclassmembers class * extends net.runelite.client.config.Config { *; }
-
 -keepclassmembernames class * { java.lang.Class class$(java.lang.String); java.lang.Class class$(java.lang.String, boolean); }
+
+-keep class net.runelite.client.plugins.pfighteraio.PFighterBanks { *; }
