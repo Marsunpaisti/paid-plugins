@@ -26,7 +26,7 @@ public class TakeBreaksState extends State {
 
     @Override
     public String getName() {
-        return "Taking a break!!!";
+        return "Taking a break";
     }
 
     @Override

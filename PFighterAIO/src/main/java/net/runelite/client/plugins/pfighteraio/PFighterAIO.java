@@ -20,6 +20,7 @@ import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.Keyboard;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
+import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.states.*;
@@ -62,6 +63,7 @@ public class PFighterAIO extends PScript {
     public int reservedInventorySlots;
     public WorldPoint safeSpot;
     public WorldPoint searchRadiusCenter;
+    public WorldPoint bankTile;
     public String[] enemiesToTarget;
     public String[] foodsToEat;
     public String[] lootNames;
@@ -95,6 +97,7 @@ public class PFighterAIO extends PScript {
     public boolean safeSpotForBreaks;
     public boolean enableBreaks;
     private boolean flickQuickPrayers;
+    private boolean assistFlickPrayers;
     private int breakMinIntervalMinutes;
     private int breakMaxIntervalMinutes;
     private int breakMinDurationSeconds;
@@ -132,22 +135,32 @@ public class PFighterAIO extends PScript {
     }
 
     public boolean shouldPray() {
-        if (PPlayer.get().getInteracting() != null){
-            if (validTargetFilterWithoutDistance.test((NPC)PPlayer.get().getInteracting())) {
+        if (isRunning()){
+            if (PPlayer.get().getInteracting() != null){
+                if (validTargetFilterWithoutDistance.test((NPC)PPlayer.get().getInteracting())) {
+                    return true;
+                }
+            }
+
+            if (PObjects.findNPC(validTargetFilterWithoutDistance.and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
+                return true;
+            }
+        } else if (assistFlickPrayers){
+            if (PPlayer.get().getInteracting() != null && PPlayer.get().getInteracting() instanceof NPC){
+                if (Filters.NPCs.actionsContains("Attack").test((NPC)PPlayer.get().getInteracting())) {
+                    return true;
+                }
+            }
+            if (PObjects.findNPC(Filters.NPCs.actionsContains("Attack").and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
                 return true;
             }
         }
-
-        if (PObjects.findNPC(validTargetFilterWithoutDistance.and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
-            return true;
-        }
-
         return false;
     }
 
     @Subscribe
     private void onGameTick(GameTick event){
-        if (flickQuickPrayers && isRunning() && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
+        if (((isRunning() && flickQuickPrayers) || assistFlickPrayers) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
             if (shouldPray()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
                     prayerFlickExecutor.submit(() -> {
@@ -246,6 +259,10 @@ public class PFighterAIO extends PScript {
         reservedInventorySlots = 0;
 
         // Banking
+        bankTile = null;
+        if (config.bankLocation() != PFighterBanks.AUTODETECT){
+            bankTile = config.bankLocation().getWorldPoint();
+        }
         bankForFood = config.bankForFood();
         bankForLoot = config.bankForLoot();
         bankingEnabled = config.enableBanking();
@@ -286,7 +303,8 @@ public class PFighterAIO extends PScript {
 
         // Prayer
         flickQuickPrayers = config.flickQuickPrayers();
-        if (flickQuickPrayers) {
+        assistFlickPrayers = config.assistFlickPrayers();
+        if (flickQuickPrayers || assistFlickPrayers) {
             if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
         }
 

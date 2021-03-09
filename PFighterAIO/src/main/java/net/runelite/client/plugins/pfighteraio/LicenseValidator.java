@@ -37,24 +37,21 @@ public class LicenseValidator {
     public void startValidating() {
         startSession();
         while (true) {
-            synchronized (this){
-                if (shouldStop) {
-                    log.info("License validator stopped");
-                    return;
-                }
-            }
             try {
-                Thread.sleep(periodSeconds*1000);
+                Thread.sleep(1000);
             } catch (InterruptedException e){
                 log.error(e.toString());
             }
             synchronized (this){
                 if (shouldStop) {
+                    stopSession();
                     log.info("License validator stopped");
                     return;
                 }
             }
-            refreshSession();
+            if (Duration.between(lastSuccessfulValidation, Instant.now()).getSeconds() >= periodSeconds) {
+                refreshSession();
+            }
         }
     }
 
@@ -68,6 +65,32 @@ public class LicenseValidator {
 
     public synchronized String getLastError(){
         return this.lastError;
+    }
+
+    private boolean stopSession() {
+        JsonObject payload = new JsonObject(); //Json.object().add("data", Json.object().add("apiKey", apiKey).add("licenseType", licenseType).add("sessionId", sessionId));
+        JsonObject data = new JsonObject();
+        data.set("apiKey", apiKey);
+        data.set("licenseType", licenseType);
+        data.set("sessionId", sessionId);
+        payload.set("data", data);
+        JsonObject stopResult = post("https://europe-west1-paistiplugins.cloudfunctions.net/stopSession", payload);
+        if (stopResult != null && stopResult.get("result") != null) {
+            log.info("Successfully stopped session");
+            return true;
+        }
+
+        if (stopResult == null) {
+            log.error("Unable to stop session.");
+        }
+        JsonObject error = (JsonObject)stopResult.get("error");
+        if (error != null) {
+            log.error("Unable to stop session: " + error.get("message").toString());
+        } else {
+            log.error("Unable to stop session.");
+        }
+
+        return false;
     }
 
     private void startSession(){
@@ -102,18 +125,18 @@ public class LicenseValidator {
         data.set("licenseType", licenseType);
         data.set("sessionId", sessionId);
         payload.set("data", data);
-        JsonObject activationResult = post("https://europe-west1-paistiplugins.cloudfunctions.net/refreshSession", payload);
-        if (activationResult != null && activationResult.get("result") != null) {
+        JsonObject refreshResult = post("https://europe-west1-paistiplugins.cloudfunctions.net/refreshSession", payload);
+        if (refreshResult != null && refreshResult.get("result") != null) {
             synchronized (this){
                 lastSuccessfulValidation = Instant.now();
                 log.info("Successfully refreshed session");
             }
         } else {
-            if (activationResult == null) {
+            if (refreshResult == null) {
                 log.error("Unable to validate license.");
                 setLastError("Unable to validate license");
             }
-            JsonObject error = (JsonObject)activationResult.get("error");
+            JsonObject error = (JsonObject)refreshResult.get("error");
             if (error != null) {
                 log.error("Unable to validate license: " + error.get("message").toString());
                 setLastError("Unable to validate license: " + error.get("message").toString());

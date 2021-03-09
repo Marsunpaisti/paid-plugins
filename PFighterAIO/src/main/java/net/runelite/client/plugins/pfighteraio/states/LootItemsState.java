@@ -2,6 +2,7 @@ package net.runelite.client.plugins.pfighteraio.states;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.plugins.paistisuite.api.*;
+import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;

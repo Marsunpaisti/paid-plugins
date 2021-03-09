@@ -5,6 +5,7 @@ import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
+import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
 
 @Slf4j
@@ -55,31 +56,34 @@ public class BankingState extends State {
     }
 
     @Override
-    public void loop(){
+    public void loop() {
         super.loop();
         if (attempts >= maxAttempts) {
             bankingFailure = true;
         }
 
-        if (PBanking.openBank()){
-             if (!PUtils.waitCondition(PUtils.random(14000, 16000), PBanking::isBankOpen)){
-                 attempts++;
-                 return;
-             }
+        if (PBanking.openBank()) {
+            if (!PUtils.waitCondition(PUtils.random(14000, 16000), PBanking::isBankOpen)) {
+                attempts++;
+                return;
+            }
 
-             PBanking.depositInventory();
-             PUtils.sleepNormal(500, 1500, 100, 800);
-             if (!withdrawDesiredInventory()) {
-                 bankingFailure = true;
-                 return;
-             }
-             attempts = 0;
-             shouldBank = false;
-             return;
+            PBanking.depositInventory();
+            PUtils.sleepNormal(500, 1500, 100, 800);
+            if (!withdrawDesiredInventory()) {
+                bankingFailure = true;
+                return;
+            }
+            attempts = 0;
+            shouldBank = false;
+            return;
         }
 
         DaxWalker.getInstance().allowTeleports = plugin.teleportWhileBanking;
-        if (!DaxWalker.walkToBank(plugin.walkingCondition)) {
+        if (plugin.bankTile == null && !DaxWalker.walkToBank(plugin.walkingCondition)) {
+            attempts++;
+            return;
+        } else if (plugin.bankTile != null && !DaxWalker.walkTo(new RSTile(plugin.bankTile), plugin.walkingCondition)) {
             attempts++;
             return;
         } else {

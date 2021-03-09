@@ -273,6 +273,18 @@ public interface PFighterAIOConfig extends Config
     }
 
     @ConfigItem(
+            keyName = "bankLocation",
+            name = "Bank location",
+            description = "Select the bank location to use",
+            position = 86,
+            section = bankingSection
+    )
+    default PFighterBanks bankLocation()
+    {
+        return PFighterBanks.AUTODETECT;
+    }
+
+    @ConfigItem(
             keyName = "bankForFood",
             name = "Bank when out of food",
             description = "Bank when out of food",
@@ -419,6 +431,17 @@ public interface PFighterAIOConfig extends Config
             position = 161
     )
     default boolean flickQuickPrayers()
+    {
+        return false;
+    }
+    @ConfigItem(
+            keyName = "assistFlickPrayers",
+            name = "Use as combat assistant",
+            description = "Flicks quick prayers for you when script is not on, so you can play manually with prayer flick assist",
+            section = prayerSection,
+            position = 162
+    )
+    default boolean assistFlickPrayers()
     {
         return false;
     }
