@@ -32,7 +32,7 @@ subprojects {
     project.extra["PluginProvider"] = "Paisti"
     project.extra["ProjectUrl"] = "https://github.com/Marsunpaisti/openosrs-plugins"
     project.extra["ProjectSupportUrl"] = "https://discord.gg/tT8BQQ8J9G"
-    project.extra["PluginLicense"] = "3-Clause BSD License"
+    project.extra["PluginLicense"] = "Copyright (C) Aleksi Kytölä - All rights reserved"
 
     repositories {
         jcenter {
