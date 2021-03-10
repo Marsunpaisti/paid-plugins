@@ -1,10 +1,13 @@
 package net.runelite.client.plugins.pfighteraio.states;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Skill;
 import net.runelite.client.plugins.paistisuite.api.*;
+import net.runelite.client.plugins.paistisuite.api.WebWalker.shared.helpers.magic.RuneElement;
 import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
+import net.runelite.client.plugins.paistisuite.api.types.Spells;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
 
 import java.time.Duration;
@@ -53,6 +56,8 @@ public class LootItemsState extends State {
 
         PGroundItem target = getNextLootableItem();
         if (target != null){
+
+            // Eat food to make space if necessary
             if (PInventory.getEmptySlots() <= plugin.reservedInventorySlots && plugin.eatFoodForLoot){
                 List<PItem> foodItems = PInventory.findAllItems(plugin.validFoodFilter);
                 int quantityBefore = foodItems.size();
@@ -62,18 +67,44 @@ public class LootItemsState extends State {
                     PUtils.waitCondition(PUtils.random(700, 1300), () -> PInventory.findAllItems(plugin.validFoodFilter).size() < quantityBefore);
                 }
             }
-            PUtils.sleepNormal(100, 700);
+            PUtils.sleepNormal(100, 300);
             log.info("Looting " + target.getName() + " price: " + target.getPricePerSlot());
-
             if (plugin.isStopRequested()) return;
+            int countBefore = PInventory.getCount(target.getName());
             if (PInteraction.groundItem(target, "Take"))
             {
                 if (plugin.isStopRequested()) return;
+                // Wait for movement to stop
                 if (PPlayer.location().distanceTo(target.getLocation()) >= 1){
                     PUtils.waitCondition(PUtils.random(1400, 2200), PPlayer::isMoving);
                 }
                 PUtils.waitCondition(PUtils.random(4000, 6000), () -> !PPlayer.isMoving());
-                PUtils.sleepNormal(100, 900, 100, 200);
+
+                // Wait for item to appear in inventory
+                if (PUtils.waitCondition(PUtils.random(1900, 2900), () -> PInventory.getCount(target.getName()) > countBefore)) {
+                    if (plugin.isStopRequested()) return;
+                    // Maybe alch item
+                    log.info("fire: " + RuneElement.FIRE.getCount());
+                    log.info("nat: " + RuneElement.NATURE.getCount());
+                    if (plugin.enableAlching) {
+                        if (RuneElement.FIRE.getCount() < 5 || RuneElement.NATURE.getCount() < 1 || PSkills.getCurrentLevel(Skill.MAGIC) < 55) {
+                            log.info("Cannot alch item, no runes left or magic level is too low");
+                        } else {
+                            int slotHAPrice = target.getHaPrice();
+                            int slotGEPrice = target.getGePrice();
+                            int priceDifference = slotGEPrice - slotHAPrice;
+                            if (priceDifference <= plugin.alchMaxPriceDifference && slotHAPrice >= plugin.alchMinHAValue) {
+                                PUtils.sleepNormal(300, 700);
+                                PItem looted = PInventory.findItem(Filters.Items.idEquals(target.getId()));
+                                if (looted != null) {
+                                    log.info("Alching " + looted.getName() + " GE price difference is " + priceDifference);
+                                    PInteraction.useSpellOnItem(Spells.HIGH_LEVEL_ALCHEMY, looted);
+                                }
+                            }
+                        }
+                    }
+                }
+                PUtils.sleepNormal(100, 900, 80, 300);
             }
         }
     }

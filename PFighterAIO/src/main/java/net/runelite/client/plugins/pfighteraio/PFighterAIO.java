@@ -98,6 +98,9 @@ public class PFighterAIO extends PScript {
     public boolean enableBreaks;
     private boolean flickQuickPrayers;
     private boolean assistFlickPrayers;
+    public boolean enableAlching;
+    public int alchMinHAValue;
+    public int alchMaxPriceDifference;
     private int breakMinIntervalMinutes;
     private int breakMaxIntervalMinutes;
     private int breakMinDurationSeconds;
@@ -257,6 +260,9 @@ public class PFighterAIO extends PScript {
         lootGEValue = config.lootGEValue();
         validLootFilter = createValidLootFilter();
         reservedInventorySlots = 0;
+        enableAlching = config.enableAlching();
+        alchMaxPriceDifference = config.alchMaxPriceDifference();
+        alchMinHAValue = config.alchMinHAValue();
 
         // Banking
         bankTile = null;

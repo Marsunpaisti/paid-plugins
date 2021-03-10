@@ -207,11 +207,51 @@ public interface PFighterAIOConfig extends Config
         return false;
     }
 
+    @ConfigItem(
+            keyName = "enableAlching",
+            name = "Enable alching",
+            description = "Enable high alchemy feature",
+            section = lootingsection,
+            position = 57
+    )
+    default boolean enableAlching()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "alchMinHAValue",
+            name = "Alch Min HA value",
+            description = "Alches items whose HA value is at least this",
+            section = lootingsection,
+            position = 58,
+            hidden = true,
+            unhide = "enableAlching"
+    )
+    default int alchMinHAValue()
+    {
+        return 400;
+    }
+
+    @ConfigItem(
+            keyName = "alchMaxPriceDifference",
+            name = "Alch Max price difference",
+            description = "Dont alch item if its GE value is this much higher than HA value",
+            section = lootingsection,
+            position = 59,
+            hidden = true,
+            unhide = "enableAlching"
+    )
+    default int alchMaxPriceDifference()
+    {
+        return 6000;
+    }
+
 
     @ConfigSection(
             name = "Safe spotting",
             description = "Enter enemy names/ids to target",
-            position = 15,
+            position = 70,
             closedByDefault = true,
             keyName = "safespotsection"
     )
