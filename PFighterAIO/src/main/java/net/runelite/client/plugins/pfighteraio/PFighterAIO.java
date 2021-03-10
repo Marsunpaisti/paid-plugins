@@ -164,15 +164,15 @@ public class PFighterAIO extends PScript {
             if (shouldPray()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
                     prayerFlickExecutor.submit(() -> {
-                        PUtils.sleepNormal(50, 275);
+                        PUtils.sleepNormal(25, 240);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Deactivate");
-                        PUtils.sleepNormal(100, 175);
+                        PUtils.sleepNormal(90, 150);
                         PInteraction.widget(quickPray, "Activate");
                     });
                 } else {
                     prayerFlickExecutor.submit(() -> {
-                        PUtils.sleepNormal(100, 350);
+                        PUtils.sleepNormal(25, 240);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Activate");
                     });

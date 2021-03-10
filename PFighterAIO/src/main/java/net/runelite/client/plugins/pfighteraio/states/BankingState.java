@@ -35,7 +35,7 @@ public class BankingState extends State {
 
     @Override
     public boolean condition() {
-        if (!plugin.bankingEnabled) return false;
+        if (!plugin.bankingEnabled || bankingFailure) return false;
 
         // No food -> go bank
         if (plugin.bankForFood && PInventory.findAllItems(plugin.validFoodFilter).size() == 0){
