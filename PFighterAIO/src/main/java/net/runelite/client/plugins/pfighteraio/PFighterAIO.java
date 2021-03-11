@@ -576,6 +576,7 @@ public class PFighterAIO extends PScript {
         handleRun();
         if (isStopRequested()) return;
         handleAntiAfk();
+        handleLevelUps();
 
         State prevState = currentState;
         currentState = getValidState();
@@ -588,6 +589,15 @@ public class PFighterAIO extends PScript {
             currentState.loop();
         } else {
             setCurrentStateName("Looking for state...");
+        }
+    }
+
+    private void handleLevelUps(){
+        if (PDialogue.isConversationWindowUp()){
+            List<Widget> options = PDialogue.getDialogueOptions();
+            if (options.stream().anyMatch(o -> o.getText().contains("Click here to continue"))){
+                PDialogue.clickHereToContinue();
+            }
         }
     }
 

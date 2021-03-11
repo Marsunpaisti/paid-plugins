@@ -157,11 +157,16 @@ public class SetupCannonState extends State {
             PItem cannonbase = PInventory.findItem(Filters.Items.nameEquals("Cannon base"));
             if (PInteraction.item(cannonbase, "Set-up")) {
                 if (PUtils.waitCondition(PUtils.random(6000, 8000), () -> plugin.isCannonPlaced() && plugin.isCannonFinished())){
-                    PUtils.sleepNormal(650, 1000);
+                    PUtils.sleepNormal(800, 1300);
                     PTileObject cannon = plugin.getCannon();
-                    String[] actions = cannon.getDef().getActions();
-                    PInteraction.tileObject(cannon, "Fire");
-                    PUtils.sleepNormal(700, 1300);
+                    if (!PInteraction.tileObject(cannon, "Fire")){
+                        PUtils.sleepNormal(700, 1300);
+                        cannon = plugin.getCannon();
+                        if (PInteraction.tileObject(cannon, "Fire")){
+                            PUtils.sleepNormal(700, 1300);
+                        }
+                    }
+                    PUtils.sleepNormal(200, 700);
                     attempts = 0;
                 } else {
                     log.info("Timed out when waiting for cannon to appear");
