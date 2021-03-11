@@ -1,4 +1,4 @@
-version = "2.4.0"
+version = "2.5.0"
 
 project.extra["PluginName"] = "PFighter AIO"
 project.extra["PluginDescription"] = "Fully configurable all-in-one fighter - Premium version"

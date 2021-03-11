@@ -8,6 +8,10 @@ import net.runelite.api.queries.NPCQuery;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
+
+import static net.runelite.api.ObjectID.*;
+import static net.runelite.api.ProjectileID.CANNONBALL;
+import static net.runelite.api.ProjectileID.GRANITE_CANNONBALL;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.PluginDependency;
@@ -23,6 +27,7 @@ import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
+import net.runelite.client.plugins.paistisuite.api.types.PTileObject;
 import net.runelite.client.plugins.pfighteraio.states.*;
 import net.runelite.client.ui.overlay.OverlayManager;
 import org.pf4j.Extension;
@@ -36,7 +41,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Extension
@@ -57,6 +65,7 @@ public class PFighterAIO extends PScript {
     public Instant startedTimestamp;
     boolean usingSavedSafeSpot = false;
     boolean usingSavedFightTile = false;
+    boolean usingSavedCannonTile = false;
     public int minEatHp;
     public int maxEatHp;
     public int searchRadius;
@@ -64,6 +73,7 @@ public class PFighterAIO extends PScript {
     public WorldPoint safeSpot;
     public WorldPoint searchRadiusCenter;
     public WorldPoint bankTile;
+    public WorldPoint cannonTile;
     public String[] enemiesToTarget;
     public String[] foodsToEat;
     public String[] lootNames;
@@ -90,12 +100,20 @@ public class PFighterAIO extends PScript {
     public WalkToFightAreaState walkToFightAreaState;
     public BankingState bankingState;
     public TakeBreaksState takeBreaksState;
+    public SetupCannonState setupCannonState;
     private String currentStateName;
     private long lastAntiAfk = System.currentTimeMillis();
     private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
     public PBreakScheduler breakScheduler = null;
     public boolean safeSpotForBreaks;
     public boolean enableBreaks;
+    public boolean useCannon;
+    private int cannonBallsLeft;
+    private boolean cannonPlaced;
+    private boolean cannonFinished;
+    private WorldPoint currentCannonPos;
+    private int currentCannonWorld;
+    private final ReentrantLock cannonVarsLock = new ReentrantLock();
     private boolean flickQuickPrayers;
     private boolean assistFlickPrayers;
     public boolean enableAlching;
@@ -106,7 +124,8 @@ public class PFighterAIO extends PScript {
     private int breakMinDurationSeconds;
     private int breakMaxDurationSeconds;
     private ExecutorService prayerFlickExecutor;
-
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("([0-9]+)");
+    private static boolean skipProjectileCheckThisTick = false;
 
     @Inject
     private PFighterAIOConfig config;
@@ -163,6 +182,7 @@ public class PFighterAIO extends PScript {
 
     @Subscribe
     private void onGameTick(GameTick event){
+        skipProjectileCheckThisTick = false;
         if (((isRunning() && flickQuickPrayers) || assistFlickPrayers) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
             if (shouldPray()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
@@ -209,6 +229,7 @@ public class PFighterAIO extends PScript {
         walkToFightAreaState = new WalkToFightAreaState(this);
         bankingState = new BankingState(this);
         takeBreaksState = new TakeBreaksState(this);
+        setupCannonState = new SetupCannonState(this);
 
         startedTimestamp = Instant.now();
         if (usingSavedSafeSpot){
@@ -217,12 +238,16 @@ public class PFighterAIO extends PScript {
         if (usingSavedFightTile){
             PUtils.sendGameMessage("Loaded fight area from last config.");
         }
+        if (usingSavedCannonTile){
+            PUtils.sendGameMessage("Loaded cannon tile from last config.");
+        }
         DaxWalker.setCredentials(PaistiSuite.getDaxCredentialsProvider());
         DaxWalker.getInstance().allowTeleports = true;
         states = new ArrayList<State>();
         states.add(this.bankingState);
         states.add(this.takeBreaksState);
         states.add(this.lootItemsState);
+        states.add(this.setupCannonState);
         states.add(this.fightEnemiesState);
         states.add(this.walkToFightAreaState);
         currentState = null;
@@ -288,17 +313,6 @@ public class PFighterAIO extends PScript {
             PUtils.sendGameMessage("Error when trying to read withdraw items list");
         }
 
-
-        // Stored tiles
-        if (safeSpot == null){
-            usingSavedSafeSpot = true;
-            safeSpot = config.storedSafeSpotTile();
-        }
-        if (searchRadiusCenter == null){
-            usingSavedFightTile = true;
-            searchRadiusCenter = config.storedFightTile();
-        }
-
         // Breaks
         enableBreaks = config.enableBreaks();
         safeSpotForBreaks = config.safeSpotForBreaks();
@@ -314,6 +328,23 @@ public class PFighterAIO extends PScript {
             if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
         }
 
+        // Cannoning
+        useCannon = config.useCannon();
+
+        // Stored tiles
+        if (safeSpot == null){
+            usingSavedSafeSpot = true;
+            safeSpot = config.storedSafeSpotTile();
+        }
+        if (searchRadiusCenter == null){
+            usingSavedFightTile = true;
+            searchRadiusCenter = config.storedFightTile();
+        }
+        if (cannonTile == null && useCannon){
+            usingSavedCannonTile = true;
+            cannonTile = config.storedCannonTile();
+        }
+
         // Licensing
         apiKey = config.apiKey();
 
@@ -322,6 +353,182 @@ public class PFighterAIO extends PScript {
         log.info("Loot names: " + String.join(", ", lootNames));
         log.info("Loot over value: " + (lootGEValue <= 0 ? "disabled" : lootGEValue));
         log.info("Min eat: " + minEatHp + " max eat: " + maxEatHp + " next eat: " + nextEatAt);
+    }
+
+    @Subscribe
+    public void onGameObjectSpawned(GameObjectSpawned event)
+    {
+        GameObject gameObject = event.getGameObject();
+        if (gameObject.getId() == CANNON_BASE && !isCannonPlaced())
+        {
+            Player localPlayer = PPlayer.get();
+            if (localPlayer.getWorldLocation().distanceTo(gameObject.getWorldLocation()) <= 2
+                    && localPlayer.getAnimation() == AnimationID.BURYING_BONES)
+            {
+                log.info("Cannon placement started");
+                synchronized (cannonVarsLock) {
+                    cannonFinished = false;
+                    cannonPlaced = true;
+                    currentCannonPos = gameObject.getWorldLocation();
+                    currentCannonWorld = PUtils.getClient().getWorld();
+                }
+            }
+        }
+    }
+
+    @Subscribe
+    public void onChatMessage(ChatMessage event)
+    {
+        if (event.getType() != ChatMessageType.SPAM && event.getType() != ChatMessageType.GAMEMESSAGE)
+        {
+            return;
+        }
+
+        if (event.getMessage().equals("You add the furnace."))
+        {
+            synchronized (cannonVarsLock){
+                cannonPlaced = true;
+                cannonFinished = true;
+                cannonBallsLeft = 0;
+            }
+        }
+
+        if (event.getMessage().contains("You pick up the cannon")
+                || event.getMessage().contains("Your cannon has decayed. Speak to Nulodion to get a new one!")
+                || event.getMessage().contains("Your cannon has been destroyed!"))
+        {
+            synchronized (cannonVarsLock){
+                cannonPlaced = false;
+                cannonBallsLeft = 0;
+            }
+        }
+
+        if (event.getMessage().startsWith("You load the cannon with"))
+        {
+            Matcher m = NUMBER_PATTERN.matcher(event.getMessage());
+            if (m.find())
+            {
+                // The cannon will usually refill to MAX_CBALLS, but if the
+                // player didn't have enough cannonballs in their inventory,
+                // it could fill up less than that. Filling the cannon to
+                // cballsLeft + amt is not always accurate though because our
+                // counter doesn't decrease if the player has been too far away
+                // from the cannon due to the projectiels not being in memory,
+                // so our counter can be higher than it is supposed to be.
+                int amt = Integer.valueOf(m.group());
+                synchronized (cannonVarsLock){
+                    if (cannonBallsLeft + amt >= 30)
+                    {
+                        skipProjectileCheckThisTick = true;
+                        cannonBallsLeft = 30;
+                    }
+                    else
+                    {
+                        cannonBallsLeft += amt;
+                    }
+                }
+            }
+            else if (event.getMessage().equals("You load the cannon with one cannonball."))
+            {
+                synchronized (cannonVarsLock) {
+                    if (cannonBallsLeft + 1 >= 30)
+                    {
+                        skipProjectileCheckThisTick = true;
+                        cannonBallsLeft = 30;
+                    }
+                    else
+                    {
+                        cannonBallsLeft++;
+                    }
+                }
+            }
+        }
+
+        if (event.getMessage().contains("Your cannon is out of ammo!"))
+        {
+            skipProjectileCheckThisTick = true;
+            // If the player was out of range of the cannon, some cannonballs
+            // may have been used without the client knowing, so having this
+            // extra check is a good idea.
+            synchronized (cannonVarsLock){
+                cannonBallsLeft = 0;
+            }
+        }
+
+        if (event.getMessage().startsWith("You unload your cannon and receive Cannonball")
+                || event.getMessage().startsWith("You unload your cannon and receive Granite cannonball"))
+        {
+            skipProjectileCheckThisTick = true;
+
+            synchronized (cannonVarsLock){
+                cannonBallsLeft = 0;
+            }
+        }
+    }
+
+    @Subscribe
+    public void onProjectileMoved(ProjectileMoved event)
+    {
+        Projectile projectile = event.getProjectile();
+
+        if ((projectile.getId() == CANNONBALL || projectile.getId() == GRANITE_CANNONBALL) && getCurrentCannonPos() != null && getCurrentCannonWorld() == PUtils.getClient().getWorld())
+        {
+            WorldPoint projectileLoc = WorldPoint.fromLocal(PUtils.getClient(), projectile.getX1(), projectile.getY1(), PUtils.getClient().getPlane());
+
+            //Check to see if projectile x,y is 0 else it will continuously decrease while ball is flying.
+            if (projectileLoc.equals(getCurrentCannonPos()) && projectile.getX() == 0 && projectile.getY() == 0)
+            {
+                // When there's a chat message about cannon reloaded/unloaded/out of ammo,
+                // the message event runs before the projectile event. However they run
+                // in the opposite order on the server. So if both fires in the same tick,
+                // we don't want to update the cannonball counter if it was set to a specific
+                // amount.
+                if (!skipProjectileCheckThisTick)
+                {
+                    synchronized (cannonVarsLock){
+                        cannonBallsLeft--;
+                    }
+                }
+            }
+        }
+    }
+
+    public PTileObject getCannon(){
+        WorldPoint searchPos;
+        synchronized (cannonVarsLock){
+            searchPos = new WorldPoint(currentCannonPos.getX(), currentCannonPos.getY(), currentCannonPos.getPlane());
+        }
+        return PObjects.findObject(Filters.Objects.idEquals(5,6,7,8,9).and((ob) -> ob.getWorldLocation().distanceTo(searchPos) <= 2));
+    }
+
+    public int getCannonBallsLeft() {
+        synchronized (cannonVarsLock) {
+            return this.cannonBallsLeft;
+        }
+    }
+
+    public boolean isCannonPlaced(){
+        synchronized (cannonVarsLock){
+            return this.cannonPlaced;
+        }
+    }
+
+    public boolean isCannonFinished(){
+        synchronized (cannonVarsLock){
+            return this.cannonFinished;
+        }
+    }
+
+    public WorldPoint getCurrentCannonPos(){
+        synchronized (cannonVarsLock){
+            return this.currentCannonPos;
+        }
+    }
+
+    public int getCurrentCannonWorld(){
+        synchronized (cannonVarsLock) {
+            return currentCannonWorld;
+        }
     }
 
     @Override
@@ -502,7 +709,7 @@ public class PFighterAIO extends PScript {
 
     private synchronized Predicate<NPC> createValidTargetFilter(boolean ignoreDistance){
         Predicate<NPC> filter = (NPC n) -> {
-            return (ignoreDistance ||n.getWorldLocation().distanceToHypotenuse(searchRadiusCenter) <= searchRadius)
+            return (ignoreDistance || n.getWorldLocation().distanceToHypotenuse(searchRadiusCenter) <= searchRadius)
                     && Filters.NPCs.nameOrIdEquals(enemiesToTarget).test(n)
                     && (n.getInteracting() == null || n.getInteracting().equals(PPlayer.get()))
                     && !n.isDead();
@@ -522,7 +729,7 @@ public class PFighterAIO extends PScript {
         filter = filter.and(item -> item.getLocation().distanceToHypotenuse(searchRadiusCenter) <= (searchRadius+2));
         filter = filter.and(item -> lootItemsState.haveSpaceForItem(item));
         if (config.lootOwnKills()) filter = filter.and(item -> item.getLootType() == PGroundItem.LootType.PVM);
-        if (config.enablePathfind()) filter = filter.and(item -> isReachable(item.getLocation()));
+        filter = filter.and(item -> isReachable(item.getLocation()));
         return filter;
     }
 
@@ -548,7 +755,7 @@ public class PFighterAIO extends PScript {
         if (!configButtonClicked.getGroup().equalsIgnoreCase("PFighterAIO")) return;
         if (PPlayer.get() == null && PUtils.getClient().getGameState() != GameState.LOGGED_IN) return;
 
-        if (configButtonClicked.getKey().equals("startButton"))
+        if (configButtonClicked.getKey().equalsIgnoreCase("startButton"))
         {
             Player player = PPlayer.get();
             try {
@@ -557,18 +764,23 @@ public class PFighterAIO extends PScript {
                 log.error(e.toString());
                 e.printStackTrace();
             }
-        } else if (configButtonClicked.getKey().equals("stopButton")){
+        } else if (configButtonClicked.getKey().equalsIgnoreCase("stopButton")){
             requestStop();
-        } else if (configButtonClicked.getKey().equals("setFightAreaButton")) {
+        } else if (configButtonClicked.getKey().equalsIgnoreCase("setFightAreaButton")) {
             PUtils.sendGameMessage("Fight area set to your position!");
             configManager.setConfiguration("PFighterAIO", "storedFightTile", PPlayer.location());
             searchRadiusCenter = PPlayer.location();
             usingSavedFightTile = false;
-        } else if (configButtonClicked.getKey().equals("setSafeSpotButton")) {
+        } else if (configButtonClicked.getKey().equalsIgnoreCase("setSafeSpotButton")) {
             PUtils.sendGameMessage("Safe spot set to your position!");
             configManager.setConfiguration("PFighterAIO", "storedSafeSpotTile", PPlayer.location());
             safeSpot = PPlayer.location();
             usingSavedSafeSpot = false;
+        } else if (configButtonClicked.getKey().equalsIgnoreCase("setCannonTileButton")){
+            PUtils.sendGameMessage("Cannon tile set to your position!");
+            configManager.setConfiguration("PFighterAIO", "storedCannonTile", PPlayer.location());
+            cannonTile = PPlayer.location();
+            usingSavedCannonTile = false;
         }
     }
 

@@ -62,6 +62,11 @@ public class BankingState extends State {
             bankingFailure = true;
         }
 
+        if (plugin.useCannon && plugin.isCannonPlaced()){
+            plugin.setupCannonState.pickupCannon();
+            return;
+        }
+
         if (PBanking.openBank()) {
             if (!PUtils.waitCondition(PUtils.random(14000, 16000), PBanking::isBankOpen)) {
                 attempts++;

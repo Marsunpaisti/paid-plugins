@@ -474,6 +474,7 @@ public interface PFighterAIOConfig extends Config
     {
         return false;
     }
+
     @ConfigItem(
             keyName = "assistFlickPrayers",
             name = "Use as combat assistant",
@@ -484,6 +485,39 @@ public interface PFighterAIOConfig extends Config
     default boolean assistFlickPrayers()
     {
         return false;
+    }
+
+    @ConfigSection(
+            name = "BETA: Cannon",
+            description = "Cannon options",
+            position = 170,
+            closedByDefault = true,
+            keyName = "cannonSection"
+    )
+    String cannonSection = "BETA: Cannon";
+
+    @ConfigItem(
+            keyName = "useCannon",
+            name = "Use cannon",
+            description = "Use dwarf cannon to fight",
+            section = cannonSection,
+            position = 171
+    )
+    default boolean useCannon()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "setCannonTileButton",
+            name = "Set cannon tile",
+            description = "Sets cannon tile where you are standing",
+            section = cannonSection,
+            position = 172
+    )
+    default Button setCannonTileButton()
+    {
+        return new Button();
     }
 
     @ConfigItem(
@@ -539,6 +573,18 @@ public interface PFighterAIOConfig extends Config
             position = 201
     )
     default WorldPoint storedSafeSpotTile()
+    {
+        return null;
+    }
+
+    @ConfigItem (
+            keyName = "storedCannonTile",
+            hidden = true,
+            name = "Stored cannon tile",
+            description = "Used to save last used cannon tile",
+            position = 201
+    )
+    default WorldPoint storedCannonTile()
     {
         return null;
     }

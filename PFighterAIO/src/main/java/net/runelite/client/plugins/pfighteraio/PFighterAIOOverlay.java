@@ -67,6 +67,9 @@ public class PFighterAIOOverlay extends Overlay
 		if (plugin.safeSpot != null){
 			drawTile(graphics, plugin.safeSpot, new Color(0, 255, 0, 35), new Color(0, 255, 0, 120));
 		}
+		if (plugin.cannonTile != null){
+			drawTile(graphics, plugin.cannonTile, new Color(255, 195, 15, 35), new Color(255, 195, 15, 120));
+		}
 
 		if (plugin.enemiesToTarget != null && plugin.searchRadiusCenter != null){
 			java.util.List<NPC> validTargets = plugin.getValidTargets();

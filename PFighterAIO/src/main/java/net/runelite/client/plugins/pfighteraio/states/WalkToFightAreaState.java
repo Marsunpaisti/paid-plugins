@@ -19,7 +19,7 @@ public class WalkToFightAreaState extends State {
     @Override
     public boolean condition() {
         return !plugin.searchRadiusCenter.isInScene(PUtils.getClient())
-                || plugin.searchRadiusCenter.distanceTo(PPlayer.location()) > plugin.searchRadius*0.9;
+                || plugin.searchRadiusCenter.distanceTo(PPlayer.location()) > plugin.searchRadius;
     }
 
     @Override
