@@ -384,6 +384,8 @@ public class PFighterAIO extends PScript {
             return;
         }
 
+        if (event.getMessage() == null) return;
+
         if (event.getMessage().equals("You add the furnace."))
         {
             synchronized (cannonVarsLock){
@@ -415,7 +417,15 @@ public class PFighterAIO extends PScript {
                 // counter doesn't decrease if the player has been too far away
                 // from the cannon due to the projectiels not being in memory,
                 // so our counter can be higher than it is supposed to be.
-                int amt = Integer.valueOf(m.group());
+                int amt = 0;
+                try {
+                    amt = Integer.parseInt(m.group());
+                } catch (Exception e){
+                    log.error("Error parsing cannonball amount: " + e.getMessage());
+                    e.printStackTrace();
+                    return;
+                }
+
                 synchronized (cannonVarsLock){
                     if (cannonBallsLeft + amt >= 30)
                     {
@@ -556,8 +566,8 @@ public class PFighterAIO extends PScript {
 
     private boolean checkValidator(){
         if (!licenseValidator.isValid() && !fightEnemiesState.inCombat()) {
-            log.info(licenseValidator.getLastError());
-            PUtils.sendGameMessage(licenseValidator.getLastError());
+            log.info("License Validation error: " + licenseValidator.getLastError());
+            PUtils.sendGameMessage("License validation error: " + licenseValidator.getLastError());
             requestStop();
             return false;
         }
@@ -569,7 +579,7 @@ public class PFighterAIO extends PScript {
         PUtils.sleepFlat(50, 150);
         if (PUtils.getClient().getGameState() != GameState.LOGGED_IN) return;
 
-        if(!checkValidator()) return;
+        if (!checkValidator()) return;
         if (handleStopConditions()) return;
         handleEating();
         if (isStopRequested()) return;
@@ -588,6 +598,7 @@ public class PFighterAIO extends PScript {
             setCurrentStateName(currentState.chainedName());
             currentState.loop();
         } else {
+            log.info("Looking for state...");
             setCurrentStateName("Looking for state...");
         }
     }

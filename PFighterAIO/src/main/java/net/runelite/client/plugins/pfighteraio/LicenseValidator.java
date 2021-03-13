@@ -197,8 +197,8 @@ public class LicenseValidator {
     // https://europe-west1-paistiplugins.cloudfunctions.net/startSession
     // https://europe-west1-paistiplugins.cloudfunctions.net/refreshSession
     public synchronized boolean isValid(){
-        if (Duration.between(created, Instant.now()).getSeconds() <= 10) return true;
+        if (Duration.between(created, Instant.now()).getSeconds() <= 20) return true;
         if (lastSuccessfulValidation == null) return false;
-        return Duration.between(lastSuccessfulValidation, Instant.now()).getSeconds() <= periodSeconds + 10;
+        return Duration.between(lastSuccessfulValidation, Instant.now()).getSeconds() <= periodSeconds + 20;
     }
 }

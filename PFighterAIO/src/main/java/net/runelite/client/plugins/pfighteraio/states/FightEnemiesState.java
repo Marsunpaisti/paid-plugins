@@ -32,7 +32,7 @@ public class FightEnemiesState extends State {
         super.loop();
 
         // In combat and outside safespot
-        if (inCombat() && plugin.safeSpotForCombat && PPlayer.location().distanceTo(plugin.safeSpot) > 0) {
+        if (inCombat() && plugin.safeSpotForCombat && PPlayer.location().distanceTo(plugin.safeSpot) > 0 && PPlayer.location().distanceTo2D(plugin.safeSpot) < 40) {
             PWalking.sceneWalk(plugin.safeSpot);
             PUtils.waitCondition(PUtils.random(700, 1300), () -> PPlayer.isMoving());
             PUtils.waitCondition(PUtils.random(4000, 6000), () -> !PPlayer.isMoving());
