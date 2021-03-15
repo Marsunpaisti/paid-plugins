@@ -220,7 +220,7 @@ public interface PFighterAIOConfig extends Config
     )
     default boolean lootOwnKills()
     {
-        return false;
+        return true;
     }
 
     @ConfigItem(
@@ -560,11 +560,71 @@ public interface PFighterAIOConfig extends Config
         return new Button();
     }
 
+    @ConfigSection(
+            name = "BETA: Worldhopping",
+            description = "Worldhopping options",
+            position = 179,
+            closedByDefault = true,
+            keyName = "worldhopSection"
+    )
+    String worldhopSection = "BETA: Worldhopping";
+
+    @ConfigItem(
+            keyName = "worldHopInSafespot",
+            name = "Go to safe spot before hop",
+            description = "Go to safe spot before hopping worlds",
+            section = worldhopSection,
+            position = 180
+    )
+    default boolean worldHopInSafespot()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "worldhopIfPlayerTalks",
+            name = "Worldhop if a player talks",
+            description = "Worldhop if a player talks in the area",
+            section = worldhopSection,
+            position = 181
+    )
+    default boolean worldhopIfPlayerTalks()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "worldhopIfTooManyPlayers",
+            name = "Worldhop if > X players",
+            description = "Worldhop if too many players are nearby",
+            section = worldhopSection,
+            position = 182
+    )
+    default boolean worldhopIfTooManyPlayers()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "worldhopPlayerLimit",
+            name = "Player limit",
+            description = "Minimum limit of players to find nearby before worldhopping",
+            section = worldhopSection,
+            position = 183,
+            hidden = true,
+            unhide = "worldhopIfTooManyPlayers"
+
+    )
+    default int worldhopPlayerLimit()
+    {
+        return 2;
+    }
+
     @ConfigItem(
             keyName = "apiKey",
             name = "API Key",
             description = "Your secret API/License key",
-            position = 179
+            position = 195
     )
     default String apiKey()
     {
@@ -575,7 +635,7 @@ public interface PFighterAIOConfig extends Config
             keyName = "startButton",
             name = "Start",
             description = "Start",
-            position = 180
+            position = 196
     )
     default Button startButton()
     {
@@ -586,7 +646,7 @@ public interface PFighterAIOConfig extends Config
             keyName = "stopButton",
             name = "Stop",
             description = "Stop",
-            position = 181
+            position = 197
     )
     default Button stopButton()
     {
@@ -598,7 +658,7 @@ public interface PFighterAIOConfig extends Config
             hidden = true,
             name = "Stored fight tile",
             description = "Used to save last used fight tile",
-            position = 200
+            position = 210
     )
     default WorldPoint storedFightTile()
     {
@@ -610,7 +670,7 @@ public interface PFighterAIOConfig extends Config
             hidden = true,
             name = "Stored safe spot tile",
             description = "Used to save last used safe spot tile",
-            position = 201
+            position = 211
     )
     default WorldPoint storedSafeSpotTile()
     {
@@ -622,7 +682,7 @@ public interface PFighterAIOConfig extends Config
             hidden = true,
             name = "Stored cannon tile",
             description = "Used to save last used cannon tile",
-            position = 201
+            position = 212
     )
     default WorldPoint storedCannonTile()
     {

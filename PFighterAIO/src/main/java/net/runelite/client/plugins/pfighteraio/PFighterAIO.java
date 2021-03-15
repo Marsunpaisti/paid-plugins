@@ -59,6 +59,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Singleton
 public class PFighterAIO extends PScript {
+    private ExecutorService prayerFlickExecutor;
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("([0-9]+)");
+    private static boolean skipProjectileCheckThisTick = false;
     int nextRunAt = PUtils.random(25,65);
     int nextEatAt;
     public boolean enablePathfind;
@@ -105,6 +108,7 @@ public class PFighterAIO extends PScript {
     public TakeBreaksState takeBreaksState;
     public SetupCannonState setupCannonState;
     public DrinkPotionsState drinkPotionsState;
+    public WorldhopState worldhopState;
     private String currentStateName;
     private long lastAntiAfk = System.currentTimeMillis();
     private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
@@ -127,9 +131,10 @@ public class PFighterAIO extends PScript {
     private int breakMaxIntervalMinutes;
     private int breakMinDurationSeconds;
     private int breakMaxDurationSeconds;
-    private ExecutorService prayerFlickExecutor;
-    private static final Pattern NUMBER_PATTERN = Pattern.compile("([0-9]+)");
-    private static boolean skipProjectileCheckThisTick = false;
+    public boolean worldhopIfTooManyPlayers;
+    public boolean worldhopIfPlayerTalks;
+    public boolean worldhopInSafespot;
+    public int worldhopPlayerLimit;
 
     @Inject
     private PFighterAIOConfig config;
@@ -235,6 +240,7 @@ public class PFighterAIO extends PScript {
         takeBreaksState = new TakeBreaksState(this);
         setupCannonState = new SetupCannonState(this);
         drinkPotionsState = new DrinkPotionsState(this);
+        worldhopState = new WorldhopState(this);
 
         startedTimestamp = Instant.now();
         if (usingSavedSafeSpot){
@@ -251,6 +257,7 @@ public class PFighterAIO extends PScript {
         states = new ArrayList<State>();
         states.add(this.bankingState);
         states.add(this.takeBreaksState);
+        states.add(this.worldhopState);
         states.add(this.drinkPotionsState);
         states.add(this.lootItemsState);
         states.add(this.setupCannonState);
@@ -357,6 +364,12 @@ public class PFighterAIO extends PScript {
             cannonTile = config.storedCannonTile();
         }
 
+        // World hopping
+        worldhopIfPlayerTalks = config.worldhopIfPlayerTalks();
+        worldhopIfTooManyPlayers = config.worldhopIfTooManyPlayers();
+        worldhopPlayerLimit = config.worldhopPlayerLimit();
+        worldhopInSafespot = config.worldHopInSafespot();
+
         // Licensing
         apiKey = config.apiKey();
 
@@ -388,9 +401,18 @@ public class PFighterAIO extends PScript {
         }
     }
 
-    @Subscribe
-    public void onChatMessage(ChatMessage event)
-    {
+    public void handleWorldHopOnChatMessage(ChatMessage event){
+        if (event.getType() != ChatMessageType.PUBLICCHAT) return;
+        if (event.getSender().equalsIgnoreCase(PPlayer.get().getName())) return;
+
+        if (isRunning() && worldhopIfPlayerTalks && worldhopState != null) {
+            worldhopState.setWorldhopRequested(true);
+        }
+    }
+
+    public void handleChatMessageCannonVars(ChatMessage event){
+
+        // Cannon stuff
         if (event.getType() != ChatMessageType.SPAM && event.getType() != ChatMessageType.GAMEMESSAGE)
         {
             return;
@@ -486,6 +508,13 @@ public class PFighterAIO extends PScript {
                 cannonBallsLeft = 0;
             }
         }
+    }
+
+    @Subscribe
+    public void onChatMessage(ChatMessage event)
+    {
+        handleWorldHopOnChatMessage(event);
+        handleChatMessageCannonVars(event);
     }
 
     @Subscribe
