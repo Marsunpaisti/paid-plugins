@@ -104,16 +104,16 @@ public class LicenseValidator {
             }
         } else {
             if (activationResult == null) {
-                log.error("Unable to validate license.");
-                setLastError("Unable to validate license");
+                log.error("Unable to validate license. (Null activation result)");
+                setLastError("Unable to validate license. (Null activation result)");
             }
             JsonObject error = (JsonObject)activationResult.get("error");
             if (error != null) {
                 log.error("Unable to validate license: " + error.get("message").toString());
                 setLastError("Unable to validate license: " + error.get("message").toString());
             } else {
-                log.error("Unable to validate license.");
-                setLastError("Unable to validate license.");
+                log.error("Unable to validate license. (No error from server)");
+                setLastError("Unable to validate license. (No error from server");
             }
         }
     }
@@ -133,16 +133,16 @@ public class LicenseValidator {
             }
         } else {
             if (refreshResult == null) {
-                log.error("Unable to validate license.");
-                setLastError("Unable to validate license");
+                log.error("Unable to validate license. (Null refresh result)");
+                setLastError("Unable to validate license. (Null refresh result)");
             }
             JsonObject error = (JsonObject)refreshResult.get("error");
             if (error != null) {
                 log.error("Unable to validate license: " + error.get("message").toString());
                 setLastError("Unable to validate license: " + error.get("message").toString());
             } else {
-                log.error("Unable to validate license.");
-                setLastError("Unable to validate license.");
+                log.error("Unable to validate license. (No error from server)");
+                setLastError("Unable to validate license. (No error from server)");
             }
         }
     }

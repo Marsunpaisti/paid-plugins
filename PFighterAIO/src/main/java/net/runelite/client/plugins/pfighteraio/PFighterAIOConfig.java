@@ -137,11 +137,51 @@ public interface PFighterAIOConfig extends Config
     {
         return false;
     }
+    @ConfigItem(
+            keyName = "usePotions",
+            name = "Use potions",
+            description = "Drinks potions automatically when under a certain stat bonus",
+            section = eatingsection,
+            position = 33
+    )
+    default boolean usePotions()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "minPotionBoost",
+            name = "Min potion boost range",
+            description = "Minimum random range for stat boost. When current skill boost is below the randomed value, auto drinks potion.",
+            section = eatingsection,
+            position = 34,
+            hidden = true,
+            unhide = "usePotions"
+
+    )
+    default int minPotionBoost()
+    {
+        return 3;
+    }
+
+    @ConfigItem(
+            keyName = "maxPotionBoost",
+            name = "Max potion boost range",
+            description = "Maximim random range for stat boost. When current skill boost is below the randomed value, auto drinks potion.",
+            section = eatingsection,
+            position = 35,
+            hidden = true,
+            unhide = "usePotions"
+    )
+    default int maxPotionBoost()
+    {
+        return 5;
+    }
 
     @ConfigSection(
             name = "Looting",
             description = "Enter loot names/ids to pick up",
-            position = 15,
+            position = 50,
             closedByDefault = true,
             keyName = "lootingsection"
     )

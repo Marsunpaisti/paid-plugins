@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
+import net.runelite.client.plugins.paistisuite.api.types.Filters;
+import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
 
 @Slf4j
@@ -71,6 +73,19 @@ public class BankingState extends State {
             if (!PUtils.waitCondition(PUtils.random(14000, 16000), PBanking::isBankOpen)) {
                 attempts++;
                 return;
+            }
+            PUtils.sleepNormal(100, 600, 33, 200);
+
+            PItem herbSack = PInventory.findItem(Filters.Items.nameContains("herb sack"));
+            if (herbSack != null){
+                PInteraction.item(herbSack, "Empty");
+                PUtils.sleepNormal(400, 1000, 100, 600);
+            }
+
+            PItem lootingBag = PInventory.findItem(Filters.Items.nameContains("looting bag"));
+            if (lootingBag != null){
+                PInteraction.item(lootingBag, "Empty");
+                PUtils.sleepNormal(400, 1000, 100, 600);
             }
 
             PBanking.depositInventory();

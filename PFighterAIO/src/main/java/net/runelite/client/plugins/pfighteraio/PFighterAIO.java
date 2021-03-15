@@ -91,6 +91,9 @@ public class PFighterAIO extends PScript {
     public boolean bankForFood;
     public boolean bankForLoot;
     public boolean teleportWhileBanking;
+    public boolean usePotions;
+    public int minPotionBoost;
+    public int maxPotionBoost;
     private String apiKey;
     public List<BankingState.WithdrawItem> itemsToWithdraw;
     State currentState;
@@ -101,6 +104,7 @@ public class PFighterAIO extends PScript {
     public BankingState bankingState;
     public TakeBreaksState takeBreaksState;
     public SetupCannonState setupCannonState;
+    public DrinkPotionsState drinkPotionsState;
     private String currentStateName;
     private long lastAntiAfk = System.currentTimeMillis();
     private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
@@ -230,6 +234,7 @@ public class PFighterAIO extends PScript {
         bankingState = new BankingState(this);
         takeBreaksState = new TakeBreaksState(this);
         setupCannonState = new SetupCannonState(this);
+        drinkPotionsState = new DrinkPotionsState(this);
 
         startedTimestamp = Instant.now();
         if (usingSavedSafeSpot){
@@ -246,6 +251,7 @@ public class PFighterAIO extends PScript {
         states = new ArrayList<State>();
         states.add(this.bankingState);
         states.add(this.takeBreaksState);
+        states.add(this.drinkPotionsState);
         states.add(this.lootItemsState);
         states.add(this.setupCannonState);
         states.add(this.fightEnemiesState);
@@ -277,6 +283,10 @@ public class PFighterAIO extends PScript {
         minEatHp = Math.min(config.minEatHP(), maxEatHp);
         nextEatAt = (int)PUtils.randomNormal(minEatHp, maxEatHp);
         stopWhenOutOfFood = config.stopWhenOutOfFood();
+        usePotions = config.usePotions();
+        minPotionBoost = Math.max(1, config.minPotionBoost());
+        maxPotionBoost = Math.max(config.minPotionBoost(), Math.max(config.maxPotionBoost(), 8));
+        minPotionBoost = Math.min(minPotionBoost, maxPotionBoost);
 
         // Looting
         lootNames = PUtils.parseCommaSeparated(config.lootNames());
@@ -332,15 +342,17 @@ public class PFighterAIO extends PScript {
         useCannon = config.useCannon();
 
         // Stored tiles
-        if (safeSpot == null){
-            usingSavedSafeSpot = true;
-            safeSpot = config.storedSafeSpotTile();
-        }
         if (searchRadiusCenter == null){
             usingSavedFightTile = true;
             searchRadiusCenter = config.storedFightTile();
         }
-        if (cannonTile == null && useCannon){
+
+        if (safeSpot == null && config.storedSafeSpotTile().distanceTo2D(config.storedFightTile()) < 50) {
+            safeSpot = config.storedSafeSpotTile();
+            usingSavedSafeSpot = true;
+        }
+
+        if (cannonTile == null && useCannon && config.storedCannonTile().distanceTo2D(config.storedFightTile()) < 50) {
             usingSavedCannonTile = true;
             cannonTile = config.storedCannonTile();
         }
