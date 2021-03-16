@@ -9,6 +9,7 @@ import net.runelite.client.plugins.paistisuite.api.types.PGroundItem;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.paistisuite.api.types.Spells;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,13 +18,13 @@ import java.util.List;
 
 @Slf4j
 public class LootItemsState extends State {
-    public LootItemsState(PFighterAIO plugin) {
-        super(plugin);
+    public LootItemsState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
     }
 
     @Override
     public boolean condition() {
-        if (plugin.forceLoot) {
+        if (settings.isForceLoot()) {
             List<PGroundItem> loot = getLootableItems();
             if (loot != null && loot.size() > 0){
                 boolean force = loot.stream()
@@ -58,13 +59,13 @@ public class LootItemsState extends State {
         if (target != null){
 
             // Eat food to make space if necessary
-            if (PInventory.getEmptySlots() <= plugin.reservedInventorySlots && plugin.eatFoodForLoot){
-                List<PItem> foodItems = PInventory.findAllItems(plugin.validFoodFilter);
+            if (PInventory.getEmptySlots() <= settings.getReservedInventorySlots() && settings.isEatFoodForLoot()){
+                List<PItem> foodItems = PInventory.findAllItems(settings.getValidFoodFilter());
                 int quantityBefore = foodItems.size();
                 if (quantityBefore == 0) return;
                 if (PInteraction.item(foodItems.get(0), "Eat")){
                     log.info("Eating food to make space for loot");
-                    PUtils.waitCondition(PUtils.random(700, 1300), () -> PInventory.findAllItems(plugin.validFoodFilter).size() < quantityBefore);
+                    PUtils.waitCondition(PUtils.random(700, 1300), () -> PInventory.findAllItems(settings.getValidFoodFilter()).size() < quantityBefore);
                 }
             }
             PUtils.sleepNormal(100, 300);
@@ -86,14 +87,14 @@ public class LootItemsState extends State {
                     // Maybe alch item
                     log.info("fire: " + RuneElement.FIRE.getCount());
                     log.info("nat: " + RuneElement.NATURE.getCount());
-                    if (plugin.enableAlching) {
+                    if (settings.isEnableAlching()) {
                         if (RuneElement.FIRE.getCount() < 5 || RuneElement.NATURE.getCount() < 1 || PSkills.getCurrentLevel(Skill.MAGIC) < 55) {
                             log.info("Cannot alch item, no runes left or magic level is too low");
                         } else {
                             int slotHAPrice = target.getHaPrice();
                             int slotGEPrice = target.getGePrice();
                             int priceDifference = slotGEPrice - slotHAPrice;
-                            if (priceDifference <= plugin.alchMaxPriceDifference && slotHAPrice >= plugin.alchMinHAValue) {
+                            if (priceDifference <= settings.getAlchMaxPriceDifference() && slotHAPrice >= settings.getAlchMinHAValue()) {
                                 PUtils.sleepNormal(300, 700);
                                 PItem looted = PInventory.findItem(Filters.Items.idEquals(target.getId()));
                                 if (looted != null) {
@@ -120,14 +121,14 @@ public class LootItemsState extends State {
     };
 
     public boolean haveSpaceForItem(PGroundItem item){
-        if (PInventory.getEmptySlots() > plugin.reservedInventorySlots){
+        if (PInventory.getEmptySlots() > settings.getReservedInventorySlots()){
             return true;
         }
         if (item.isStackable() && PInventory.findItem(Filters.Items.idEquals(item.getId())) != null){
             return true;
         }
 
-        if (plugin.eatFoodForLoot && PInventory.findItem(plugin.validFoodFilter) != null) {
+        if (settings.isEatFoodForLoot() && PInventory.findItem(settings.getValidFoodFilter()) != null) {
             return true;
         }
 
@@ -143,6 +144,6 @@ public class LootItemsState extends State {
     }
 
     public List<PGroundItem> getLootableItems(){
-        return PGroundItems.findGroundItems(plugin.validLootFilter);
+        return PGroundItems.findGroundItems(settings.getValidLootFilter());
     }
 }

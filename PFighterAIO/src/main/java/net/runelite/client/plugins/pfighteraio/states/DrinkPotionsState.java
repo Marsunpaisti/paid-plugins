@@ -6,6 +6,7 @@ import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 import java.util.function.Predicate;
 
@@ -13,9 +14,9 @@ import java.util.function.Predicate;
 public class DrinkPotionsState extends State {
     int nextDrinkBonus;
 
-    public DrinkPotionsState(PFighterAIO plugin) {
-        super(plugin);
-        nextDrinkBonus = PUtils.random(plugin.minPotionBoost, plugin.maxPotionBoost);
+    public DrinkPotionsState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
+        nextDrinkBonus = PUtils.random(settings.getMinPotionBoost(), settings.getMaxPotionBoost());
     }
 
     public String getName(){
@@ -24,7 +25,7 @@ public class DrinkPotionsState extends State {
 
     @Override
     public boolean condition() {
-        if (!plugin.usePotions) return false;
+        if (!settings.isUsePotions()) return false;
         if (plugin.fightEnemiesState.inCombat()) return false;
 
         if (PSkills.getCurrentLevel(Skill.ATTACK) < PSkills.getActualLevel(Skill.ATTACK) + nextDrinkBonus){
@@ -53,7 +54,7 @@ public class DrinkPotionsState extends State {
             return Filters.Items.nameContains("Super Strength", "Super Combat Potion", "Combat Potion", "Strength Potion");
         }
         if (skill == Skill.DEFENCE){
-            return Filters.Items.nameContains("Super Defence", "Super Combat Potion", "Combat Potion", "Defence Potion");
+            return Filters.Items.nameContains("Super Defence", "Super Combat Potion", "Defence Potion");
         }
         if (skill == Skill.RANGED){
             return Filters.Items.nameContains("Ranging Potion", "Bastion Potion");
@@ -84,7 +85,7 @@ public class DrinkPotionsState extends State {
             potion = PInventory.findItem(potionFilterForSkill(Skill.RANGED));
         }
         if (potion != null && PInteraction.item(potion, "Drink")) {
-            nextDrinkBonus = PUtils.random(plugin.minPotionBoost, plugin.maxPotionBoost);
+            nextDrinkBonus = PUtils.random(settings.getMinPotionBoost(), settings.getMaxPotionBoost());
             PUtils.sleepNormal(700, 1200);
         }
     }

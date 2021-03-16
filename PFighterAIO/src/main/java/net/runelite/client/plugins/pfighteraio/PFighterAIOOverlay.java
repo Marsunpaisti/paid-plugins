@@ -45,6 +45,7 @@ public class PFighterAIOOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		if (!config.enableOverlay()) return null;
+		if (plugin.settings == null) return null;
 
 		/*
 		List<PGroundItem> loot = PGroundItems.getGroundItems();
@@ -61,17 +62,17 @@ public class PFighterAIOOverlay extends Overlay
 
 		WebWalkerDebugRenderer.render(graphics);
 
-		if (plugin.searchRadiusCenter != null){
-			drawTile(graphics, plugin.searchRadiusCenter, new Color(66, 254, 254, 35), new Color(66, 254, 254, 120));
+		if (plugin.settings.getSearchRadiusCenter() != null){
+			drawTile(graphics, plugin.settings.getSearchRadiusCenter(), new Color(66, 254, 254, 35), new Color(66, 254, 254, 120));
 		}
-		if (plugin.safeSpot != null){
-			drawTile(graphics, plugin.safeSpot, new Color(0, 255, 0, 35), new Color(0, 255, 0, 120));
+		if (plugin.settings.getSafeSpot() != null){
+			drawTile(graphics, plugin.settings.getSafeSpot(), new Color(0, 255, 0, 35), new Color(0, 255, 0, 120));
 		}
-		if (plugin.cannonTile != null){
-			drawTile(graphics, plugin.cannonTile, new Color(255, 195, 15, 35), new Color(255, 195, 15, 120));
+		if (plugin.settings.getCannonTile() != null){
+			drawTile(graphics, plugin.settings.getCannonTile(), new Color(255, 195, 15, 35), new Color(255, 195, 15, 120));
 		}
 
-		if (plugin.enemiesToTarget != null && plugin.searchRadiusCenter != null){
+		if (plugin.settings.getValidTargetFilter() != null && plugin.settings.getSearchRadiusCenter() != null){
 			java.util.List<NPC> validTargets = plugin.getValidTargets();
 			if (validTargets != null && validTargets.size() > 0){
 				for (NPC n : validTargets){

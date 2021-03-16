@@ -10,14 +10,15 @@ import net.runelite.client.plugins.paistisuite.api.PWalking;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
 public class FightEnemiesState extends State {
-    public FightEnemiesState(PFighterAIO plugin){
-        super(plugin);
+    public FightEnemiesState(PFighterAIO plugin, PFighterAIOSettings settings){
+        super(plugin, settings);
     }
     public long targetClickedTimestamp = System.currentTimeMillis();
     public NPC lastTarget;
@@ -32,8 +33,8 @@ public class FightEnemiesState extends State {
         super.loop();
 
         // In combat and outside safespot
-        if (inCombat() && plugin.safeSpotForCombat && PPlayer.location().distanceTo(plugin.safeSpot) > 0 && PPlayer.location().distanceTo2D(plugin.safeSpot) < 40) {
-            PWalking.sceneWalk(plugin.safeSpot);
+        if (inCombat() && settings.isSafeSpotForCombat() && PPlayer.location().distanceTo(settings.getSafeSpot()) > 0 && PPlayer.location().distanceTo2D(settings.getSafeSpot()) < 40) {
+            PWalking.sceneWalk(settings.getSafeSpot());
             PUtils.waitCondition(PUtils.random(700, 1300), () -> PPlayer.isMoving());
             PUtils.waitCondition(PUtils.random(4000, 6000), () -> !PPlayer.isMoving());
             PUtils.sleepNormal(100, 400);
@@ -51,11 +52,11 @@ public class FightEnemiesState extends State {
             attackNewTarget();
 
             // Run to safespot after attack animation starts to play
-            if (plugin.safeSpotForCombat && PPlayer.location().distanceTo(plugin.safeSpot) > 0) {
+            if (settings.isSafeSpotForCombat() && PPlayer.location().distanceTo(settings.getSafeSpot()) > 0) {
                 PUtils.waitCondition(PUtils.random(2000, 3000), () -> PPlayer.get().getAnimation() != -1);
-                if (PPlayer.location().distanceTo(plugin.safeSpot) == 0) return;
+                if (PPlayer.location().distanceTo(settings.getSafeSpot()) == 0) return;
                 PUtils.sleepNormal(100, 800, 150, 200);
-                PWalking.sceneWalk(plugin.safeSpot);
+                PWalking.sceneWalk(settings.getSafeSpot());
                 PUtils.waitCondition(PUtils.random(700, 1000), () -> PPlayer.isMoving());
                 PUtils.waitCondition(PUtils.random(3000, 4500), () -> !PPlayer.isMoving());
                 PUtils.sleepNormal(100, 800, 150, 200);
@@ -98,7 +99,7 @@ public class FightEnemiesState extends State {
     }
 
     public boolean attackLastTarget(){
-        if (lastTarget == null || !plugin.validTargetFilter.test(lastTarget)) return false;
+        if (lastTarget == null || !settings.getValidTargetFilter().test(lastTarget)) return false;
         if (PInteraction.npc(lastTarget, "Attack")) {
             targetClickedTimestamp = System.currentTimeMillis();
             return PUtils.waitCondition(PUtils.random(700, 1300), this::isInteracting);
@@ -109,7 +110,7 @@ public class FightEnemiesState extends State {
     public boolean isCurrentTargetValid(){
         NPC interacting = (NPC)PPlayer.get().getInteracting();
         if (interacting != null){
-            return plugin.validTargetFilterWithoutDistance.test(interacting);
+            return settings.getValidTargetFilterWithoutDistance().test(interacting);
         }
 
         return false;
@@ -139,7 +140,7 @@ public class FightEnemiesState extends State {
         boolean bTargetingUs = b.getInteracting() != null && b.getInteracting().equals(PPlayer.get());
         if (aTargetingUs && !bTargetingUs) return -1;
         if (bTargetingUs && !aTargetingUs) return 1;
-        if (plugin.enablePathfind) {
+        if (settings.isEnablePathfind()) {
             return pathFindDistanceTo(a.getWorldLocation()) - pathFindDistanceTo(b.getWorldLocation());
         } else {
             return (int)Math.round(distanceTo(a)) - (int)Math.round(distanceTo(b));

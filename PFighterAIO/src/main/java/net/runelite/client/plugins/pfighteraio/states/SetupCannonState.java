@@ -11,6 +11,7 @@ import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.paistisuite.api.types.PTileObject;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 import java.util.List;
 
@@ -21,26 +22,26 @@ public class SetupCannonState extends State {
     public int maxAttempts = 7;
     public boolean cannoningFailure = false;
 
-    public SetupCannonState(PFighterAIO plugin) {
-        super(plugin);
+    public SetupCannonState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
     }
 
     @Override
     public boolean condition() {
-        if (!plugin.useCannon) return false;
-        if (cannoningFailure && !plugin.isCannonPlaced()) return false;
-        if (cannoningFailure && plugin.isCannonPlaced()) return true;
-        if (PPlayer.distanceTo(plugin.searchRadiusCenter) > plugin.searchRadius + 7) return false;
-        if (plugin.cannonTile == null) return false;
-        if (plugin.searchRadiusCenter != null){
-            if (plugin.cannonTile.distanceTo(plugin.searchRadiusCenter) > plugin.searchRadius + 30) {
+        if (!settings.isUseCannon()) return false;
+        if (cannoningFailure && !settings.isCannonPlaced()) return false;
+        if (cannoningFailure && settings.isCannonPlaced()) return true;
+        if (PPlayer.distanceTo(settings.getSearchRadiusCenter()) > settings.getSearchRadius() + 7) return false;
+        if (settings.getCannonTile() == null) return false;
+        if (settings.getSearchRadiusCenter() != null){
+            if (settings.getCannonTile().distanceTo(settings.getSearchRadiusCenter()) > settings.getSearchRadius() + 30) {
                 // Dont try to use cannon if the tile is set too far
                 return false;
             }
         }
 
         // Place cannon
-        if (!plugin.isCannonPlaced()) {
+        if (!settings.isCannonPlaced()) {
             boolean haveBalls = false;
             boolean haveBarrels = false;
             boolean haveStand = false;
@@ -64,10 +65,10 @@ public class SetupCannonState extends State {
         }
 
         // Pickup cannon or reload
-        if (plugin.isCannonPlaced()) {
-            if (PInventory.getCount("Cannonball") > 0 && (plugin.getCannonBallsLeft() <= nextCannonReload || isCannonBroken())){
+        if (settings.isCannonPlaced()) {
+            if (PInventory.getCount("Cannonball") > 0 && (settings.getCannonBallsLeft() <= nextCannonReload || isCannonBroken())){
                 return true;
-            } else if (PInventory.getCount("Cannonball") == 0 && plugin.getCannonBallsLeft() <= 0) {
+            } else if (PInventory.getCount("Cannonball") == 0 && settings.getCannonBallsLeft() <= 0) {
                 return true;
             }
         }
@@ -87,19 +88,19 @@ public class SetupCannonState extends State {
             return;
         }
         int cannonBalls = PInventory.getCount("Cannonball");
-        if (!plugin.isCannonPlaced() && cannonBalls > 0) {
+        if (!settings.isCannonPlaced() && cannonBalls > 0) {
             log.info("Setting up cannon");
             setupCannon();
             return;
         }
 
-        if (plugin.isCannonPlaced() && cannonBalls <= 0){
+        if (settings.isCannonPlaced() && cannonBalls <= 0){
             log.info("Picking up cannon");
             pickupCannon();
             return;
         }
 
-        if (plugin.isCannonPlaced() && plugin.isCannonFinished() && cannonBalls > 0 && (plugin.getCannonBallsLeft() <= nextCannonReload || isCannonBroken())) {
+        if (settings.isCannonPlaced() && settings.isCannonFinished() && cannonBalls > 0 && (settings.getCannonBallsLeft() <= nextCannonReload || isCannonBroken())) {
             log.info("Reloading cannon");
             reloadCannon();
             return;
@@ -107,15 +108,15 @@ public class SetupCannonState extends State {
     }
 
     public void reloadCannon(){
-        if (!plugin.isCannonPlaced()) return;
+        if (!settings.isCannonPlaced()) return;
 
         if (!canReachCannon()){
             DaxWalker.getInstance().allowTeleports = false;
             attempts++;
-            if (!DaxWalker.walkTo(new RSTile(plugin.cannonTile.dx(1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dx(-1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dy(1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dy(-1)), plugin.walkingCondition)) {
+            if (!DaxWalker.walkTo(new RSTile(settings.getCannonTile().dx(1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dx(-1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dy(1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dy(-1)), plugin.walkingCondition)) {
                 cannoningFailure = true;
                 return;
             }
@@ -123,9 +124,9 @@ public class SetupCannonState extends State {
 
         if (canReachCannon()){
             PTileObject cannon = plugin.getCannon();
-            int ballsBefore = plugin.getCannonBallsLeft();
+            int ballsBefore = settings.getCannonBallsLeft();
             attempts++;
-            if (PInteraction.tileObject(cannon, "Fire", "Repair") && PUtils.waitCondition(PUtils.random(5000, 7000), () -> plugin.getCannonBallsLeft() > ballsBefore)){
+            if (PInteraction.tileObject(cannon, "Fire", "Repair") && PUtils.waitCondition(PUtils.random(5000, 7000), () -> settings.getCannonBallsLeft() > ballsBefore)){
                 attempts = 0;
                 nextCannonReload = PUtils.random(5, 15);
                 return;
@@ -137,26 +138,26 @@ public class SetupCannonState extends State {
     }
 
     public void setupCannon(){
-        if (plugin.isCannonPlaced()) return;
-        if (plugin.cannonTile.distanceTo(PPlayer.getWorldLocation()) > 0 && !PPlayer.isMoving()) {
-            if (plugin.isReachable(plugin.cannonTile)) {
-                PWalking.sceneWalk(plugin.cannonTile);
+        if (settings.isCannonPlaced()) return;
+        if (settings.getCannonTile().distanceTo(PPlayer.getWorldLocation()) > 0 && !PPlayer.isMoving()) {
+            if (plugin.isReachable(settings.getCannonTile())) {
+                PWalking.sceneWalk(settings.getCannonTile());
                 attempts++;
                 PUtils.sleepNormal(700, 900);
                 PUtils.waitCondition(PUtils.random(2000, 3000), () -> !PPlayer.isMoving());
             } else {
                 DaxWalker.getInstance().allowTeleports = false;
-                DaxWalker.walkTo(new RSTile(plugin.cannonTile), plugin.walkingCondition);
+                DaxWalker.walkTo(new RSTile(settings.getCannonTile()), plugin.walkingCondition);
                 attempts++;
             }
             return;
         }
 
-        if (plugin.cannonTile.distanceTo(PPlayer.getWorldLocation()) == 0){
+        if (settings.getCannonTile().distanceTo(PPlayer.getWorldLocation()) == 0){
             attempts++;
             PItem cannonbase = PInventory.findItem(Filters.Items.nameEquals("Cannon base"));
             if (PInteraction.item(cannonbase, "Set-up")) {
-                if (PUtils.waitCondition(PUtils.random(6000, 8000), () -> plugin.isCannonPlaced() && plugin.isCannonFinished())){
+                if (PUtils.waitCondition(PUtils.random(6000, 8000), () -> settings.isCannonPlaced() && settings.isCannonFinished())){
                     PUtils.sleepNormal(800, 1300);
                     PTileObject cannon = plugin.getCannon();
                     if (!PInteraction.tileObject(cannon, "Fire")){
@@ -184,22 +185,22 @@ public class SetupCannonState extends State {
     }
 
     public boolean canReachCannon(){
-        return plugin.isReachable(plugin.getCurrentCannonPos().dy(1))
-                || plugin.isReachable(plugin.getCurrentCannonPos().dy(-1))
-                || plugin.isReachable(plugin.getCurrentCannonPos().dx(1))
-                || plugin.isReachable(plugin.getCurrentCannonPos().dx(-1));
+        return plugin.isReachable(settings.getCurrentCannonPos().dy(1))
+                || plugin.isReachable(settings.getCurrentCannonPos().dy(-1))
+                || plugin.isReachable(settings.getCurrentCannonPos().dx(1))
+                || plugin.isReachable(settings.getCurrentCannonPos().dx(-1));
     }
 
     public void pickupCannon(){
-        if (!plugin.isCannonPlaced()) return;
+        if (!settings.isCannonPlaced()) return;
 
         if (!canReachCannon()){
             attempts++;
             DaxWalker.getInstance().allowTeleports = false;
-            if (!DaxWalker.walkTo(new RSTile(plugin.cannonTile.dx(1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dx(-1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dy(1)), plugin.walkingCondition)
-                    && !DaxWalker.walkTo(new RSTile(plugin.cannonTile.dy(-1)), plugin.walkingCondition)) {
+            if (!DaxWalker.walkTo(new RSTile(settings.getCannonTile().dx(1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dx(-1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dy(1)), plugin.walkingCondition)
+                    && !DaxWalker.walkTo(new RSTile(settings.getCannonTile().dy(-1)), plugin.walkingCondition)) {
                 cannoningFailure = true;
                 return;
             }
@@ -209,7 +210,7 @@ public class SetupCannonState extends State {
             attempts++;
             PTileObject cannon = plugin.getCannon();
             PInteraction.tileObject(cannon, "Pick-up");
-            if (PUtils.waitCondition(PUtils.random(5000, 7000), () -> !plugin.isCannonPlaced())){
+            if (PUtils.waitCondition(PUtils.random(5000, 7000), () -> !settings.isCannonPlaced())){
                 attempts = 0;
                 return;
             }

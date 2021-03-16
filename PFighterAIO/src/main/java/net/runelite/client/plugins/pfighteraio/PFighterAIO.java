@@ -64,77 +64,27 @@ public class PFighterAIO extends PScript {
     private static boolean skipProjectileCheckThisTick = false;
     int nextRunAt = PUtils.random(25,65);
     int nextEatAt;
-    public boolean enablePathfind;
-    public Instant startedTimestamp;
-    boolean usingSavedSafeSpot = false;
-    boolean usingSavedFightTile = false;
-    boolean usingSavedCannonTile = false;
-    public int minEatHp;
-    public int maxEatHp;
-    public int searchRadius;
-    public int reservedInventorySlots;
-    public WorldPoint safeSpot;
-    public WorldPoint searchRadiusCenter;
-    public WorldPoint bankTile;
-    public WorldPoint cannonTile;
-    public String[] enemiesToTarget;
-    public String[] foodsToEat;
-    public String[] lootNames;
-    public int lootGEValue;
-    public Predicate<NPC> validTargetFilter;
-    public Predicate<NPC> validTargetFilterWithoutDistance;
-    public Predicate<PGroundItem> validLootFilter;
-    public Predicate<PItem> validFoodFilter;
-    public boolean stopWhenOutOfFood;
-    public boolean eatFoodForLoot;
-    public boolean safeSpotForCombat;
-    public boolean safeSpotForLogout;
-    public boolean forceLoot;
-    public boolean bankingEnabled;
-    public boolean bankForFood;
-    public boolean bankForLoot;
-    public boolean teleportWhileBanking;
-    public boolean usePotions;
-    public int minPotionBoost;
-    public int maxPotionBoost;
-    private String apiKey;
-    public List<BankingState.WithdrawItem> itemsToWithdraw;
-    State currentState;
+    long lastAntiAfk;
+    long antiAfkDelay = PUtils.randomNormal(240000, 295000);
+    private boolean usingSavedFightTile;
+    private boolean usingSavedSafeSpot;
+    private boolean usingSavedCannonTile;
+
+    private LicenseValidator licenseValidator;
+    private ExecutorService validatorExecutor;
+    public PBreakScheduler breakScheduler;
+    PFighterAIOSettings settings = new PFighterAIOSettings();
     List<State> states;
-    public FightEnemiesState fightEnemiesState;
-    public LootItemsState lootItemsState;
-    public WalkToFightAreaState walkToFightAreaState;
     public BankingState bankingState;
-    public TakeBreaksState takeBreaksState;
-    public SetupCannonState setupCannonState;
+    public LootItemsState lootItemsState;
+    public FightEnemiesState fightEnemiesState;
     public DrinkPotionsState drinkPotionsState;
+    public SetupCannonState setupCannonState;
+    public TakeBreaksState takeBreaksState;
+    public WalkToFightAreaState walkToFightAreaState;
     public WorldhopState worldhopState;
-    private String currentStateName;
-    private long lastAntiAfk = System.currentTimeMillis();
-    private long antiAfkDelay = PUtils.randomNormal(120000, 270000);
-    public PBreakScheduler breakScheduler = null;
-    public boolean safeSpotForBreaks;
-    public boolean enableBreaks;
-    public boolean useCannon;
-    private int cannonBallsLeft;
-    private boolean cannonPlaced;
-    private boolean cannonFinished;
-    private WorldPoint currentCannonPos;
-    private int currentCannonWorld;
-    private final ReentrantLock cannonVarsLock = new ReentrantLock();
-    private boolean flickQuickPrayers;
-    private boolean assistFlickPrayers;
-    public boolean enableAlching;
-    public int alchMinHAValue;
-    public int alchMaxPriceDifference;
-    private int breakMinIntervalMinutes;
-    private int breakMaxIntervalMinutes;
-    private int breakMinDurationSeconds;
-    private int breakMaxDurationSeconds;
-    public boolean worldhopIfTooManyPlayers;
-    public boolean worldhopIfPlayerTalks;
-    public boolean worldhopInSafespot;
-    public int worldhopPlayerLimit;
+    State currentState;
+    State previousState;
 
     @Inject
     private PFighterAIOConfig config;
@@ -146,8 +96,6 @@ public class PFighterAIO extends PScript {
     private PFighterAIOOverlayMinimap minimapoverlay;
     @Inject
     private ConfigManager configManager;
-    private LicenseValidator licenseValidator;
-    private ExecutorService validatorExecutor;
 
     @Provides
     PFighterAIOConfig provideConfig(ConfigManager configManager)
@@ -168,15 +116,15 @@ public class PFighterAIO extends PScript {
     public boolean shouldPray() {
         if (isRunning()){
             if (PPlayer.get().getInteracting() != null){
-                if (validTargetFilterWithoutDistance.test((NPC)PPlayer.get().getInteracting())) {
+                if (settings.getValidTargetFilterWithoutDistance().test((NPC)PPlayer.get().getInteracting())) {
                     return true;
                 }
             }
 
-            if (PObjects.findNPC(validTargetFilterWithoutDistance.and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
+            if (PObjects.findNPC(settings.getValidTargetFilterWithoutDistance().and(n -> n.getInteracting() != null && n.getInteracting() == PPlayer.get())) != null){
                 return true;
             }
-        } else if (assistFlickPrayers){
+        } else if (settings.isAssistFlickPrayers()){
             if (PPlayer.get().getInteracting() != null && PPlayer.get().getInteracting() instanceof NPC){
                 if (Filters.NPCs.actionsContains("Attack").test((NPC)PPlayer.get().getInteracting())) {
                     return true;
@@ -192,7 +140,7 @@ public class PFighterAIO extends PScript {
     @Subscribe
     private void onGameTick(GameTick event){
         skipProjectileCheckThisTick = false;
-        if (((isRunning() && flickQuickPrayers) || assistFlickPrayers) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
+        if (((isRunning() && settings.isFlickQuickPrayers()) || settings.isAssistFlickPrayers()) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
             if (shouldPray()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
                     prayerFlickExecutor.submit(() -> {
@@ -232,17 +180,18 @@ public class PFighterAIO extends PScript {
     protected synchronized void onStart() {
         PUtils.sendGameMessage("AiO Fighter started!");
         readConfig();
-        breakScheduler = new PBreakScheduler(breakMinIntervalMinutes, breakMaxIntervalMinutes, breakMinDurationSeconds, breakMaxDurationSeconds);
-        fightEnemiesState = new FightEnemiesState(this);
-        lootItemsState = new LootItemsState(this);
-        walkToFightAreaState = new WalkToFightAreaState(this);
-        bankingState = new BankingState(this);
-        takeBreaksState = new TakeBreaksState(this);
-        setupCannonState = new SetupCannonState(this);
-        drinkPotionsState = new DrinkPotionsState(this);
-        worldhopState = new WorldhopState(this);
+        breakScheduler = new PBreakScheduler(settings.getBreakMinIntervalMinutes(), settings.getBreakMaxIntervalMinutes(), settings.getBreakMinDurationSeconds(), settings.getBreakMaxDurationSeconds());
+        fightEnemiesState = new FightEnemiesState(this, settings);
+        lootItemsState = new LootItemsState(this, settings);
+        walkToFightAreaState = new WalkToFightAreaState(this, settings);
+        bankingState = new BankingState(this, settings);
+        takeBreaksState = new TakeBreaksState(this, settings);
+        setupCannonState = new SetupCannonState(this, settings);
+        drinkPotionsState = new DrinkPotionsState(this, settings);
+        worldhopState = new WorldhopState(this, settings);
 
-        startedTimestamp = Instant.now();
+        settings.setStartedTimestamp(Instant.now());
+
         if (usingSavedSafeSpot){
             PUtils.sendGameMessage("Loaded safespot from last config.");
         }
@@ -264,9 +213,9 @@ public class PFighterAIO extends PScript {
         states.add(this.fightEnemiesState);
         states.add(this.walkToFightAreaState);
         currentState = null;
-        currentStateName = null;
+        settings.setCurrentStateName("Null");
 
-        licenseValidator = new LicenseValidator("PFIGHTERAIO", 600, apiKey);
+        licenseValidator = new LicenseValidator("PFIGHTERAIO", 600, settings.getApiKey());
         validatorExecutor = Executors.newSingleThreadExecutor();
         validatorExecutor.submit(() -> {
             licenseValidator.startValidating();
@@ -275,48 +224,52 @@ public class PFighterAIO extends PScript {
 
     private synchronized void readConfig(){
         // Targeting & tiles
-        searchRadius = config.searchRadius();
-        enemiesToTarget = PUtils.parseCommaSeparated(config.enemyNames());
-        safeSpotForCombat = config.enableSafeSpot();
-        safeSpotForLogout = config.exitInSafeSpot();
-        enablePathfind = config.enablePathfind();
-        validTargetFilter = createValidTargetFilter(false);
-        validTargetFilterWithoutDistance = createValidTargetFilter(true);
+        log.info("Reading targeting & tiles settings");
+        settings.setSearchRadius(config.searchRadius());
+        settings.setEnemiesToTarget(PUtils.parseCommaSeparated(config.enemyNames()));
+        settings.setSafeSpotForCombat(config.enableSafeSpot());
+        settings.setSafeSpotForLogout(config.exitInSafeSpot());
+        settings.setEnablePathfind(config.enablePathfind());
+        settings.setValidTargetFilter(createValidTargetFilter(false));
+        settings.setValidTargetFilterWithoutDistance(createValidTargetFilter(true));
 
         // Eating
-        foodsToEat = PUtils.parseCommaSeparated(config.foodNames());
-        validFoodFilter = createValidFoodFilter();
-        maxEatHp = Math.min(PSkills.getActualLevel(Skill.HITPOINTS), config.maxEatHP());
-        minEatHp = Math.min(config.minEatHP(), maxEatHp);
-        nextEatAt = (int)PUtils.randomNormal(minEatHp, maxEatHp);
-        stopWhenOutOfFood = config.stopWhenOutOfFood();
-        usePotions = config.usePotions();
-        minPotionBoost = Math.max(1, config.minPotionBoost());
-        maxPotionBoost = Math.max(config.minPotionBoost(), Math.max(config.maxPotionBoost(), 8));
-        minPotionBoost = Math.min(minPotionBoost, maxPotionBoost);
+        log.info("Reading eating settings");
+        settings.setFoodsToEat(PUtils.parseCommaSeparated(config.foodNames()));
+        settings.setValidFoodFilter(createValidFoodFilter());
+        settings.setMaxEatHp(Math.min(PSkills.getActualLevel(Skill.HITPOINTS), config.maxEatHP()));
+        settings.setMinEatHp( Math.min(config.minEatHP(), settings.getMaxEatHp()));
+        nextEatAt = (int)PUtils.randomNormal(settings.getMinEatHp(), settings.getMaxEatHp());
+        settings.setStopWhenOutOfFood(config.stopWhenOutOfFood());
+        settings.setUsePotions(config.usePotions());
+        settings.setMinPotionBoost(Math.max(1, config.minPotionBoost()));
+        settings.setMaxPotionBoost(Math.max(config.minPotionBoost(), Math.max(config.maxPotionBoost(), 8)));
+        settings.setMinPotionBoost(Math.min(settings.getMinPotionBoost(), settings.getMaxPotionBoost()));
 
         // Looting
-        lootNames = PUtils.parseCommaSeparated(config.lootNames());
-        eatFoodForLoot = config.eatForLoot();
-        forceLoot = config.forceLoot();
-        lootGEValue = config.lootGEValue();
-        validLootFilter = createValidLootFilter();
-        reservedInventorySlots = 0;
-        enableAlching = config.enableAlching();
-        alchMaxPriceDifference = config.alchMaxPriceDifference();
-        alchMinHAValue = config.alchMinHAValue();
+        log.info("Reading looting settings");
+        settings.setLootNames( PUtils.parseCommaSeparated(config.lootNames()));
+        settings.setEatFoodForLoot(config.eatForLoot());
+        settings.setForceLoot(config.forceLoot());
+        settings.setLootGEValue(config.lootGEValue());
+        settings.setValidLootFilter(createValidLootFilter());
+        settings.setReservedInventorySlots(0);
+        settings.setEnableAlching(config.enableAlching());
+        settings.setAlchMaxPriceDifference(config.alchMaxPriceDifference());
+        settings.setAlchMinHAValue(config.alchMinHAValue());
 
         // Banking
-        bankTile = null;
+        log.info("Reading banking settings");
+        settings.setBankTile(null);
         if (config.bankLocation() != PFighterBanks.AUTODETECT){
-            bankTile = config.bankLocation().getWorldPoint();
+            settings.setBankTile(config.bankLocation().getWorldPoint());
         }
-        bankForFood = config.bankForFood();
-        bankForLoot = config.bankForLoot();
-        bankingEnabled = config.enableBanking();
-        teleportWhileBanking = config.teleportWhileBanking();
+        settings.setBankForFood(config.bankForFood());
+        settings.setBankForLoot(config.bankForLoot());
+        settings.setBankingEnabled(config.enableBanking());
+        settings.setTeleportWhileBanking(config.teleportWhileBanking());
+        ArrayList<BankingState.WithdrawItem> itemsToWithdraw = new ArrayList<BankingState.WithdrawItem>();
         try {
-            itemsToWithdraw = new ArrayList<BankingState.WithdrawItem>();
             String[] split = PUtils.parseNewlineSeparated(config.withdrawItems());
             Arrays.stream(split).forEach(s -> log.info("Row: " + s));
             for (String s : split){
@@ -329,74 +282,77 @@ public class PFighterAIO extends PScript {
         } catch (Exception e){
             PUtils.sendGameMessage("Error when trying to read withdraw items list");
         }
+        settings.setItemsToWithdraw(itemsToWithdraw);
 
         // Breaks
-        enableBreaks = config.enableBreaks();
-        safeSpotForBreaks = config.safeSpotForBreaks();
-        breakMinIntervalMinutes = config.minBreakIntervalMinutes();
-        breakMaxIntervalMinutes = Math.max(config.maxBreakIntervalMinutes(), breakMinIntervalMinutes);
-        breakMinDurationSeconds = config.minBreakDurationSeconds();
-        breakMaxDurationSeconds = Math.max(config.maxBreakDurationSeconds(), breakMinDurationSeconds);
+        log.info("Reading breaks settings");
+        settings.setEnableBreaks(config.enableBreaks());
+        settings.setSafeSpotForBreaks(config.safeSpotForBreaks());
+        settings.setBreakMinIntervalMinutes(config.minBreakIntervalMinutes());
+        settings.setBreakMaxIntervalMinutes(Math.max(config.maxBreakIntervalMinutes(), settings.getBreakMinIntervalMinutes()));
+        settings.setBreakMinDurationSeconds(config.minBreakDurationSeconds());
+        settings.setBreakMaxDurationSeconds(Math.max(config.maxBreakDurationSeconds(), settings.getBreakMinDurationSeconds()));
 
         // Prayer
-        flickQuickPrayers = config.flickQuickPrayers();
-        assistFlickPrayers = config.assistFlickPrayers();
-        if (flickQuickPrayers || assistFlickPrayers) {
+        log.info("Reading prayer settings");
+        settings.setFlickQuickPrayers(config.flickQuickPrayers());
+        settings.setAssistFlickPrayers(config.assistFlickPrayers());
+        if (settings.isFlickQuickPrayers() || settings.isAssistFlickPrayers()) {
             if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
         }
 
         // Cannoning
-        useCannon = config.useCannon();
-
-        // Stored tiles
-        if (searchRadiusCenter == null){
-            usingSavedFightTile = true;
-            searchRadiusCenter = config.storedFightTile();
+        log.info("Reading cannon settings");
+        settings.setUseCannon(config.useCannon());
+        if (settings.isUseCannon()){
+            settings.setReservedInventorySlots(settings.getReservedInventorySlots() + 4);
         }
 
-        if (safeSpot == null && config.storedSafeSpotTile().distanceTo2D(config.storedFightTile()) < 50) {
-            safeSpot = config.storedSafeSpotTile();
+        // Stored tiles
+        log.info("Reading stored tiles");
+        if (settings.getSearchRadiusCenter() == null){
+            usingSavedFightTile = true;
+            settings.setSearchRadiusCenter(config.storedFightTile());
+        }
+
+        if (settings.getSafeSpot() == null && config.storedFightTile() != null && config.storedSafeSpotTile().distanceTo2D(config.storedFightTile()) < 50) {
+            settings.setSafeSpot(config.storedSafeSpotTile());
             usingSavedSafeSpot = true;
         }
 
-        if (cannonTile == null && useCannon && config.storedCannonTile().distanceTo2D(config.storedFightTile()) < 50) {
+        if (settings.getCannonTile() == null && settings.isUseCannon() && config.storedCannonTile() != null && config.storedCannonTile().distanceTo2D(config.storedFightTile()) < 50) {
             usingSavedCannonTile = true;
-            cannonTile = config.storedCannonTile();
+            settings.setCannonTile(config.storedCannonTile());
         }
 
         // World hopping
-        worldhopIfPlayerTalks = config.worldhopIfPlayerTalks();
-        worldhopIfTooManyPlayers = config.worldhopIfTooManyPlayers();
-        worldhopPlayerLimit = config.worldhopPlayerLimit();
-        worldhopInSafespot = config.worldHopInSafespot();
+        log.info("Reading worldhop settings");
+        settings.setWorldhopIfPlayerTalks(config.worldhopIfPlayerTalks());
+        settings.setWorldhopIfTooManyPlayers(config.worldhopIfTooManyPlayers());
+        settings.setWorldhopPlayerLimit(config.worldhopPlayerLimit());
+        settings.setWorldhopInSafespot(config.worldHopInSafespot());
 
         // Licensing
-        apiKey = config.apiKey();
+        settings.setApiKey(config.apiKey());
 
-        log.info("Targeting enemies: " + String.join(", ", enemiesToTarget));
-        log.info("Food names: " + String.join(", ", foodsToEat));
-        log.info("Loot names: " + String.join(", ", lootNames));
-        log.info("Loot over value: " + (lootGEValue <= 0 ? "disabled" : lootGEValue));
-        log.info("Min eat: " + minEatHp + " max eat: " + maxEatHp + " next eat: " + nextEatAt);
+        log.info(settings.toString());
     }
 
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned event)
     {
         GameObject gameObject = event.getGameObject();
-        if (gameObject.getId() == CANNON_BASE && !isCannonPlaced())
+        if (gameObject.getId() == CANNON_BASE && !settings.isCannonPlaced())
         {
             Player localPlayer = PPlayer.get();
             if (localPlayer.getWorldLocation().distanceTo(gameObject.getWorldLocation()) <= 2
                     && localPlayer.getAnimation() == AnimationID.BURYING_BONES)
             {
                 log.info("Cannon placement started");
-                synchronized (cannonVarsLock) {
-                    cannonFinished = false;
-                    cannonPlaced = true;
-                    currentCannonPos = gameObject.getWorldLocation();
-                    currentCannonWorld = PUtils.getClient().getWorld();
-                }
+                settings.setCannonFinished(false);
+                settings.setCannonPlaced(true);
+                settings.setCurrentCannonPos(gameObject.getWorldLocation());
+                settings.setCurrentCannonWorld(PUtils.getClient().getWorld());
             }
         }
     }
@@ -405,7 +361,7 @@ public class PFighterAIO extends PScript {
         if (event.getType() != ChatMessageType.PUBLICCHAT) return;
         if (event.getSender().equalsIgnoreCase(PPlayer.get().getName())) return;
 
-        if (isRunning() && worldhopIfPlayerTalks && worldhopState != null) {
+        if (isRunning() && settings.isWorldhopIfPlayerTalks() && worldhopState != null) {
             worldhopState.setWorldhopRequested(true);
         }
     }
@@ -422,21 +378,17 @@ public class PFighterAIO extends PScript {
 
         if (event.getMessage().equals("You add the furnace."))
         {
-            synchronized (cannonVarsLock){
-                cannonPlaced = true;
-                cannonFinished = true;
-                cannonBallsLeft = 0;
-            }
+            settings.setCannonPlaced(true);
+            settings.setCannonFinished(true);
+            settings.setCannonBallsLeft(0);
         }
 
         if (event.getMessage().contains("You pick up the cannon")
                 || event.getMessage().contains("Your cannon has decayed. Speak to Nulodion to get a new one!")
                 || event.getMessage().contains("Your cannon has been destroyed!"))
         {
-            synchronized (cannonVarsLock){
-                cannonPlaced = false;
-                cannonBallsLeft = 0;
-            }
+            settings.setCannonPlaced(false);
+            settings.setCannonBallsLeft(0);
         }
 
         if (event.getMessage().startsWith("You load the cannon with"))
@@ -460,30 +412,28 @@ public class PFighterAIO extends PScript {
                     return;
                 }
 
-                synchronized (cannonVarsLock){
-                    if (cannonBallsLeft + amt >= 30)
-                    {
-                        skipProjectileCheckThisTick = true;
-                        cannonBallsLeft = 30;
-                    }
-                    else
-                    {
-                        cannonBallsLeft += amt;
-                    }
+
+                if (settings.getCannonBallsLeft() + amt >= 30)
+                {
+                    skipProjectileCheckThisTick = true;
+                    settings.setCannonBallsLeft(30);
                 }
+                else
+                {
+                    settings.setCannonBallsLeft(settings.getCannonBallsLeft() + amt);
+                }
+
             }
             else if (event.getMessage().equals("You load the cannon with one cannonball."))
             {
-                synchronized (cannonVarsLock) {
-                    if (cannonBallsLeft + 1 >= 30)
-                    {
-                        skipProjectileCheckThisTick = true;
-                        cannonBallsLeft = 30;
-                    }
-                    else
-                    {
-                        cannonBallsLeft++;
-                    }
+                if (settings.getCannonBallsLeft() + 1 >= 30)
+                {
+                    skipProjectileCheckThisTick = true;
+                    settings.setCannonBallsLeft(30);
+                }
+                else
+                {
+                    settings.setCannonBallsLeft(settings.getCannonBallsLeft() + 1);
                 }
             }
         }
@@ -494,19 +444,14 @@ public class PFighterAIO extends PScript {
             // If the player was out of range of the cannon, some cannonballs
             // may have been used without the client knowing, so having this
             // extra check is a good idea.
-            synchronized (cannonVarsLock){
-                cannonBallsLeft = 0;
-            }
+            settings.setCannonBallsLeft(0);
         }
 
         if (event.getMessage().startsWith("You unload your cannon and receive Cannonball")
                 || event.getMessage().startsWith("You unload your cannon and receive Granite cannonball"))
         {
             skipProjectileCheckThisTick = true;
-
-            synchronized (cannonVarsLock){
-                cannonBallsLeft = 0;
-            }
+            settings.setCannonBallsLeft(0);
         }
     }
 
@@ -522,12 +467,12 @@ public class PFighterAIO extends PScript {
     {
         Projectile projectile = event.getProjectile();
 
-        if ((projectile.getId() == CANNONBALL || projectile.getId() == GRANITE_CANNONBALL) && getCurrentCannonPos() != null && getCurrentCannonWorld() == PUtils.getClient().getWorld())
+        if ((projectile.getId() == CANNONBALL || projectile.getId() == GRANITE_CANNONBALL) && settings.getCurrentCannonPos() != null && settings.getCurrentCannonWorld() == PUtils.getClient().getWorld())
         {
             WorldPoint projectileLoc = WorldPoint.fromLocal(PUtils.getClient(), projectile.getX1(), projectile.getY1(), PUtils.getClient().getPlane());
 
             //Check to see if projectile x,y is 0 else it will continuously decrease while ball is flying.
-            if (projectileLoc.equals(getCurrentCannonPos()) && projectile.getX() == 0 && projectile.getY() == 0)
+            if (projectileLoc.equals(settings.getCurrentCannonPos()) && projectile.getX() == 0 && projectile.getY() == 0)
             {
                 // When there's a chat message about cannon reloaded/unloaded/out of ammo,
                 // the message event runs before the projectile event. However they run
@@ -536,9 +481,7 @@ public class PFighterAIO extends PScript {
                 // amount.
                 if (!skipProjectileCheckThisTick)
                 {
-                    synchronized (cannonVarsLock){
-                        cannonBallsLeft--;
-                    }
+                    settings.setCannonBallsLeft(settings.getCannonBallsLeft() - 1);
                 }
             }
         }
@@ -546,47 +489,17 @@ public class PFighterAIO extends PScript {
 
     public PTileObject getCannon(){
         WorldPoint searchPos;
-        synchronized (cannonVarsLock){
-            searchPos = new WorldPoint(currentCannonPos.getX(), currentCannonPos.getY(), currentCannonPos.getPlane());
-        }
+        WorldPoint currentCannonPos = settings.getCurrentCannonPos();
+        searchPos = new WorldPoint(currentCannonPos.getX(), currentCannonPos.getY(), currentCannonPos.getPlane());
         return PObjects.findObject(Filters.Objects.idEquals(5,6,7,8,9).and((ob) -> ob.getWorldLocation().distanceTo(searchPos) <= 2));
-    }
-
-    public int getCannonBallsLeft() {
-        synchronized (cannonVarsLock) {
-            return this.cannonBallsLeft;
-        }
-    }
-
-    public boolean isCannonPlaced(){
-        synchronized (cannonVarsLock){
-            return this.cannonPlaced;
-        }
-    }
-
-    public boolean isCannonFinished(){
-        synchronized (cannonVarsLock){
-            return this.cannonFinished;
-        }
-    }
-
-    public WorldPoint getCurrentCannonPos(){
-        synchronized (cannonVarsLock){
-            return this.currentCannonPos;
-        }
-    }
-
-    public int getCurrentCannonWorld(){
-        synchronized (cannonVarsLock) {
-            return currentCannonWorld;
-        }
     }
 
     @Override
     protected synchronized void onStop() {
         PUtils.sendGameMessage("AiO Fighter stopped!");
-        searchRadiusCenter = null;
-        safeSpot = null;
+        settings.setSearchRadiusCenter(null);
+        settings.setSafeSpot(null);
+        settings.setCannonTile(null);
         licenseValidator.requestStop();
     }
 
@@ -629,18 +542,18 @@ public class PFighterAIO extends PScript {
         handleAntiAfk();
         handleLevelUps();
 
-        State prevState = currentState;
+        previousState = currentState;
         currentState = getValidState();
         if(!checkValidator()) return;
         if (currentState != null) {
-            if (prevState != currentState){
+            if (previousState != currentState){
                 log.info("Entered state: " + currentState.getName());
             }
-            setCurrentStateName(currentState.chainedName());
+            settings.setCurrentStateName(currentState.chainedName());
             currentState.loop();
         } else {
             log.info("Looking for state...");
-            setCurrentStateName("Looking for state...");
+            settings.setCurrentStateName("Looking for state...");
         }
     }
 
@@ -668,10 +581,10 @@ public class PFighterAIO extends PScript {
             PUtils.sleepNormal(700, 1500);
         }
 
-        if (safeSpotForLogout && PPlayer.location().distanceTo(safeSpot) != 0 && PPlayer.distanceTo(safeSpot) <= 45) {
-            if (!PWalking.sceneWalk(safeSpot)) {
+        if (settings.isSafeSpotForLogout() && PPlayer.location().distanceTo(settings.getSafeSpot()) != 0 && PPlayer.distanceTo(settings.getSafeSpot()) <= 45) {
+            if (!PWalking.sceneWalk(settings.getSafeSpot())) {
                 DaxWalker.getInstance().allowTeleports = false;
-                DaxWalker.walkTo(new RSTile(safeSpot), walkingCondition);
+                DaxWalker.walkTo(new RSTile(settings.getSafeSpot()), walkingCondition);
             }
 
             return true;
@@ -694,16 +607,16 @@ public class PFighterAIO extends PScript {
     }
 
     private boolean handleStopConditions(){
-        if (stopWhenOutOfFood && PInventory.findItem(validFoodFilter) == null) {
+        if (settings.isStopWhenOutOfFood() && PInventory.findItem(settings.getValidFoodFilter()) == null) {
             log.info("Stopping. No food remaining.");
-            setCurrentStateName("Stopping. No food remaining.");
+            settings.setCurrentStateName("Stopping. No food remaining.");
             executeStop();
             return true;
         }
 
         if (this.bankingState.bankingFailure){
             log.info("Stopping. Banking failed.");
-            setCurrentStateName("Stopping. Banking failed.");
+            settings.setCurrentStateName("Stopping. Banking failed.");
             executeStop();
             return true;
         }
@@ -713,12 +626,12 @@ public class PFighterAIO extends PScript {
 
     private boolean handleEating(){
         if (PSkills.getCurrentLevel(Skill.HITPOINTS) <= nextEatAt){
-            nextEatAt = (int)PUtils.randomNormal(minEatHp, maxEatHp);
+            nextEatAt = (int)PUtils.randomNormal(settings.getMinEatHp(), settings.getMaxEatHp());
             log.info("Next eat at " + nextEatAt);
             NPC targetBeforeEating = null;
             if (currentState == fightEnemiesState
                     && fightEnemiesState.inCombat()
-                    && validTargetFilter.test((NPC)PPlayer.get().getInteracting())
+                    && settings.getValidTargetFilter().test((NPC)PPlayer.get().getInteracting())
             ) {
                 targetBeforeEating = (NPC)PPlayer.get().getInteracting();
             }
@@ -735,7 +648,7 @@ public class PFighterAIO extends PScript {
     }
 
     public boolean eatFood(){
-        PItem food = PInventory.findItem(validFoodFilter);
+        PItem food = PInventory.findItem(settings.getValidFoodFilter());
         if (food != null) log.info("Eating " + food.getName());
         if (PInteraction.item(food, "Eat")){
             log.info("Ate food");
@@ -763,16 +676,13 @@ public class PFighterAIO extends PScript {
     }
 
     public List<NPC> getValidTargets(){
-        return PUtils.clientOnly(() -> {
-            return new NPCQuery().result(PUtils.getClient())
-                    .list.stream().filter(validTargetFilter).collect(Collectors.toList());
-        }, "getValidTargets");
+        return PObjects.findAllNPCs(settings.getValidTargetFilter());
     }
 
     private synchronized Predicate<NPC> createValidTargetFilter(boolean ignoreDistance){
         Predicate<NPC> filter = (NPC n) -> {
-            return (ignoreDistance || n.getWorldLocation().distanceToHypotenuse(searchRadiusCenter) <= searchRadius)
-                    && Filters.NPCs.nameOrIdEquals(enemiesToTarget).test(n)
+            return (ignoreDistance || (n.getWorldLocation() != null && n.getWorldLocation().distanceToHypotenuse(settings.getSearchRadiusCenter()) <= settings.getSearchRadius()))
+                    && Filters.NPCs.nameOrIdEquals(settings.getEnemiesToTarget()).test(n)
                     && (n.getInteracting() == null || n.getInteracting().equals(PPlayer.get()))
                     && !n.isDead();
         };
@@ -782,13 +692,13 @@ public class PFighterAIO extends PScript {
     };
 
     private synchronized Predicate<PItem> createValidFoodFilter(){
-        return Filters.Items.nameOrIdEquals(foodsToEat);
+        return Filters.Items.nameOrIdEquals(settings.getFoodsToEat());
     }
 
     private synchronized Predicate<PGroundItem> createValidLootFilter(){
-        Predicate<PGroundItem> filter = Filters.GroundItems.nameContainsOrIdEquals(lootNames);
-        if (lootGEValue > 0) filter = filter.or(Filters.GroundItems.SlotPriceAtLeast(lootGEValue));
-        filter = filter.and(item -> item.getLocation().distanceToHypotenuse(searchRadiusCenter) <= (searchRadius+2));
+        Predicate<PGroundItem> filter = Filters.GroundItems.nameContainsOrIdEquals(settings.getLootNames());
+        if (settings.getLootGEValue() > 0) filter = filter.or(Filters.GroundItems.SlotPriceAtLeast(settings.getLootGEValue()));
+        filter = filter.and(item -> item.getLocation().distanceToHypotenuse(settings.getSearchRadiusCenter()) <= (settings.getSearchRadius()+2));
         filter = filter.and(item -> lootItemsState.haveSpaceForItem(item));
         if (config.lootOwnKills()) filter = filter.and(item -> item.getLootType() == PGroundItem.LootType.PVM);
         filter = filter.and(item -> isReachable(item.getLocation()));
@@ -831,26 +741,18 @@ public class PFighterAIO extends PScript {
         } else if (configButtonClicked.getKey().equalsIgnoreCase("setFightAreaButton")) {
             PUtils.sendGameMessage("Fight area set to your position!");
             configManager.setConfiguration("PFighterAIO", "storedFightTile", PPlayer.location());
-            searchRadiusCenter = PPlayer.location();
+            settings.setSearchRadiusCenter(PPlayer.location());
             usingSavedFightTile = false;
         } else if (configButtonClicked.getKey().equalsIgnoreCase("setSafeSpotButton")) {
             PUtils.sendGameMessage("Safe spot set to your position!");
             configManager.setConfiguration("PFighterAIO", "storedSafeSpotTile", PPlayer.location());
-            safeSpot = PPlayer.location();
+            settings.setSafeSpot(PPlayer.location());
             usingSavedSafeSpot = false;
         } else if (configButtonClicked.getKey().equalsIgnoreCase("setCannonTileButton")){
             PUtils.sendGameMessage("Cannon tile set to your position!");
             configManager.setConfiguration("PFighterAIO", "storedCannonTile", PPlayer.location());
-            cannonTile = PPlayer.location();
+            settings.setCannonTile(PPlayer.location());
             usingSavedCannonTile = false;
         }
-    }
-
-    public synchronized String getCurrentStateName() {
-        return currentStateName;
-    }
-
-    public synchronized void setCurrentStateName(String currentStateName) {
-        this.currentStateName = currentStateName;
     }
 }

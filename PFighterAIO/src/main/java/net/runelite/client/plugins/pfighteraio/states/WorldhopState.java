@@ -10,6 +10,7 @@ import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 import java.util.function.Predicate;
 
@@ -20,8 +21,8 @@ public class WorldhopState extends State {
     private int maxAttempts = 8;
     private boolean worldHopFailure = false;
 
-    public WorldhopState(PFighterAIO plugin) {
-        super(plugin);
+    public WorldhopState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
         isWorldhopRequested = false;
     }
 
@@ -39,13 +40,13 @@ public class WorldhopState extends State {
 
     @Override
     public boolean condition() {
-        if (!plugin.worldhopIfTooManyPlayers && !plugin.worldhopIfPlayerTalks) return false;
+        if (!settings.isWorldhopIfTooManyPlayers() && !settings.isWorldhopIfPlayerTalks()) return false;
         if (plugin.fightEnemiesState.inCombat()) return false;
         if (worldHopFailure) return false;
 
-        if (plugin.worldhopIfTooManyPlayers){
+        if (settings.isWorldhopIfTooManyPlayers()){
             Integer playerCount = PUtils.clientOnly(() -> new PlayerQuery().isWithinDistance(PPlayer.getWorldLocation(), 30).result(PUtils.getClient()).size(), "getPlayerCount");
-            if (playerCount != null && playerCount >= plugin.worldhopPlayerLimit + 1){
+            if (playerCount != null && playerCount >= settings.getWorldhopPlayerLimit() + 1){
                 isWorldhopRequested = true;
                 return true;
             }
@@ -63,24 +64,24 @@ public class WorldhopState extends State {
             return;
         }
         if (!PPlayer.isMoving()
-                && plugin.worldhopInSafespot
-                && plugin.safeSpot != null
-                && PPlayer.getWorldLocation().distanceTo2D(plugin.safeSpot) > 0
-                && PPlayer.getWorldLocation().distanceTo2D(plugin.safeSpot) < 45) {
-            if (Reachable.getMap().canReach(plugin.safeSpot)) {
-                PWalking.sceneWalk(plugin.safeSpot);
+                && settings.isWorldhopInSafespot()
+                && settings.getSafeSpot() != null
+                && PPlayer.getWorldLocation().distanceTo2D(settings.getSafeSpot()) > 0
+                && PPlayer.getWorldLocation().distanceTo2D(settings.getSafeSpot()) < 45) {
+            if (Reachable.getMap().canReach(settings.getSafeSpot())) {
+                PWalking.sceneWalk(settings.getSafeSpot());
                 PUtils.sleepNormal(200, 400);
                 PUtils.waitCondition(1800, () -> PPlayer.isMoving());
                 attempts++;
             } else {
                 attempts++;
                 DaxWalker.getInstance().allowTeleports = false;
-                DaxWalker.walkTo(new RSTile(plugin.safeSpot), plugin.walkingCondition);
+                DaxWalker.walkTo(new RSTile(settings.getSafeSpot()), plugin.walkingCondition);
             }
             return;
         }
 
-        if (plugin.worldhopInSafespot && plugin.safeSpot != null && PPlayer.getWorldLocation().distanceTo2D(plugin.safeSpot) > 0 && PPlayer.getWorldLocation().distanceTo2D(plugin.safeSpot) < 45) return;
+        if (settings.isWorldhopInSafespot() && settings.getSafeSpot() != null && PPlayer.getWorldLocation().distanceTo2D(settings.getSafeSpot()) > 0 && PPlayer.getWorldLocation().distanceTo2D(settings.getSafeSpot()) < 45) return;
 
         attempts++;
         if (PWorldHopper.hop()){

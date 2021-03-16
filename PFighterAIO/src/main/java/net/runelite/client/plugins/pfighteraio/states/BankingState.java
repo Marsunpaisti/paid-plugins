@@ -9,6 +9,7 @@ import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.paistisuite.api.types.Filters;
 import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 @Slf4j
 public class BankingState extends State {
@@ -24,28 +25,28 @@ public class BankingState extends State {
         int quantity;
     }
 
-    public BankingState(PFighterAIO plugin) {
-        super(plugin);
+    public BankingState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
         bankingFailure = false;
     }
 
     public boolean requestBanking(){
-        if (!plugin.bankingEnabled) return false;
+        if (!settings.isBankingEnabled()) return false;
         shouldBank = true;
         return true;
     }
 
     @Override
     public boolean condition() {
-        if (!plugin.bankingEnabled || bankingFailure) return false;
+        if (!settings.isBankingEnabled() || bankingFailure) return false;
 
         // No food -> go bank
-        if (plugin.bankForFood && PInventory.findAllItems(plugin.validFoodFilter).size() == 0){
+        if (settings.isBankForFood() && PInventory.findAllItems(settings.getValidFoodFilter()).size() == 0){
             shouldBank = true;
         }
 
         // No inventory space & no food to eat for space -> go bank
-        if (plugin.bankForLoot && PInventory.getEmptySlots() <= plugin.reservedInventorySlots && (!plugin.eatFoodForLoot || PInventory.findItem(plugin.validFoodFilter) == null)){
+        if (settings.isBankForLoot() && PInventory.getEmptySlots() <= settings.getReservedInventorySlots() && (!settings.isEatFoodForLoot() || PInventory.findItem(settings.getValidFoodFilter()) == null)){
             shouldBank = true;
         }
 
@@ -64,7 +65,7 @@ public class BankingState extends State {
             bankingFailure = true;
         }
 
-        if (plugin.useCannon && plugin.isCannonPlaced()){
+        if (settings.isUseCannon() && settings.isCannonPlaced()){
             plugin.setupCannonState.pickupCannon();
             return;
         }
@@ -99,11 +100,11 @@ public class BankingState extends State {
             return;
         }
 
-        DaxWalker.getInstance().allowTeleports = plugin.teleportWhileBanking;
-        if (plugin.bankTile == null && !DaxWalker.walkToBank(plugin.walkingCondition)) {
+        DaxWalker.getInstance().allowTeleports = settings.isTeleportWhileBanking();
+        if (settings.getBankTile() == null && !DaxWalker.walkToBank(plugin.walkingCondition)) {
             attempts++;
             return;
-        } else if (plugin.bankTile != null && !DaxWalker.walkTo(new RSTile(plugin.bankTile), plugin.walkingCondition)) {
+        } else if (settings.getBankTile() != null && !DaxWalker.walkTo(new RSTile(settings.getBankTile()), plugin.walkingCondition)) {
             attempts++;
             return;
         } else {
@@ -114,7 +115,7 @@ public class BankingState extends State {
     }
 
     public boolean withdrawDesiredInventory(){
-        for (WithdrawItem i : plugin.itemsToWithdraw){
+        for (WithdrawItem i : settings.getItemsToWithdraw()){
             if (!PBanking.withdrawItem(i.nameOrId, i.quantity)) {
                 PUtils.sendGameMessage("Unable to withdraw item: " + i.nameOrId);
                 return false;

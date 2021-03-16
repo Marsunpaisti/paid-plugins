@@ -9,18 +9,19 @@ import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
+import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
 
 @Slf4j
 public class TakeBreaksState extends State {
     private boolean currentlyTakingBreak;
-    public TakeBreaksState(PFighterAIO plugin) {
-        super(plugin);
+    public TakeBreaksState(PFighterAIO plugin, PFighterAIOSettings settings) {
+        super(plugin, settings);
         this.currentlyTakingBreak = false;
     }
 
     @Override
     public boolean condition() {
-        if (plugin.breakScheduler == null || !plugin.enableBreaks || plugin.fightEnemiesState.inCombat()) return false;
+        if (plugin.breakScheduler == null || !settings.isEnableBreaks() || plugin.fightEnemiesState.inCombat()) return false;
         return this.currentlyTakingBreak || plugin.breakScheduler.shouldTakeBreak();
     }
 
@@ -51,12 +52,12 @@ public class TakeBreaksState extends State {
             return;
         }
 
-        if (this.currentlyTakingBreak && plugin.safeSpotForBreaks && plugin.safeSpot != null && PPlayer.distanceTo(plugin.safeSpot) < 40 && PPlayer.distanceTo(plugin.safeSpot) > 0 && !PPlayer.isMoving()){
-            if (Reachable.getMap().canReach(plugin.safeSpot)){
-                PWalking.sceneWalk(plugin.safeSpot);
+        if (this.currentlyTakingBreak && settings.isSafeSpotForBreaks() && settings.getSafeSpot() != null && PPlayer.distanceTo(settings.getSafeSpot()) < 40 && PPlayer.distanceTo(settings.getSafeSpot()) > 0 && !PPlayer.isMoving()){
+            if (Reachable.getMap().canReach(settings.getSafeSpot())){
+                PWalking.sceneWalk(settings.getSafeSpot());
             } else {
                 DaxWalker.getInstance().allowTeleports = false;
-                DaxWalker.walkTo(new RSTile(plugin.safeSpot));
+                DaxWalker.walkTo(new RSTile(settings.getSafeSpot()));
             }
         }
     }

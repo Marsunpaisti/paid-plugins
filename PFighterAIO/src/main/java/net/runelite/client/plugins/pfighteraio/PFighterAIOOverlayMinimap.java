@@ -42,10 +42,11 @@ public class PFighterAIOOverlayMinimap extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		if (!config.enableOverlay()) return null;
+		if (plugin.settings == null) return null;
 
 		renderInfoBox(graphics);
 
-		if (plugin.searchRadiusCenter != null){
+		if (plugin.settings.getSearchRadiusCenter() != null){
 			renderFightArea(graphics);
 		}
 		return null;
@@ -53,7 +54,7 @@ public class PFighterAIOOverlayMinimap extends Overlay
 
 	public void renderInfoBox(Graphics2D graphics){
 		if (!plugin.isRunning()) return;
-		if (plugin.startedTimestamp == null) return;
+		if (plugin.settings.getStartedTimestamp() == null) return;
 		Widget base = null;
 		if (PWidgets.isSubstantiated(WidgetInfo.CHATBOX)){
 			base = PWidgets.get(WidgetInfo.CHATBOX_PARENT);
@@ -73,10 +74,10 @@ public class PFighterAIOOverlayMinimap extends Overlay
 		int currentRowPos = (int)drawPos + 16;
 		int horizontalPos1 = (int)base.getBounds().getX() + 3;
 		int horizontalPos2 = (int)base.getBounds().getX() + 3 + (int)infoBoxWidth/2;
-		long d = Duration.between(plugin.startedTimestamp, Instant.now()).getSeconds();
+		long d = Duration.between(plugin.settings.getStartedTimestamp(), Instant.now()).getSeconds();
 		String runTimeStr = String.format("%d:%02d:%02d", d / 3600, (d % 3600) / 60, (d % 60));
 		graphics.drawString("Runtime: " + runTimeStr, horizontalPos1, currentRowPos);
-		graphics.drawString("State: " + plugin.getCurrentStateName(), horizontalPos2, currentRowPos);
+		graphics.drawString("State: " + plugin.settings.getCurrentStateName(), horizontalPos2, currentRowPos);
 		currentRowPos += rowHeight;
 		//graphics.drawString("Runtime: " + runTimeStr, horizontalPos1, currentRowPos);
 		//currentRowPos += rowHeight;
@@ -84,8 +85,8 @@ public class PFighterAIOOverlayMinimap extends Overlay
 
 	public void renderFightArea(Graphics2D graphics)
 	{
-		int radius = plugin.searchRadius*4;
-		LocalPoint lp = LocalPoint.fromWorld(PUtils.getClient(), plugin.searchRadiusCenter);
+		int radius = plugin.settings.getSearchRadius()*4;
+		LocalPoint lp = LocalPoint.fromWorld(PUtils.getClient(), plugin.settings.getSearchRadiusCenter());
 		if (lp == null) return;
 		Point mini = Perspective.localToMinimap(PUtils.getClient(), lp);
 		if (mini == null) return;
