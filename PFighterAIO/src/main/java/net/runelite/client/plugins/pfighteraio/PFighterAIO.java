@@ -359,7 +359,7 @@ public class PFighterAIO extends PScript {
 
     public void handleWorldHopOnChatMessage(ChatMessage event){
         if (event.getType() != ChatMessageType.PUBLICCHAT) return;
-        if (event.getSender().equalsIgnoreCase(PPlayer.get().getName())) return;
+        if (event.getSender() != null && event.getSender().equalsIgnoreCase(PPlayer.get().getName())) return;
 
         if (isRunning() && settings.isWorldhopIfPlayerTalks() && worldhopState != null) {
             worldhopState.setWorldhopRequested(true);

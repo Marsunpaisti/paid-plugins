@@ -72,7 +72,7 @@ public class BankingState extends State {
 
         if (PBanking.openBank()) {
             if (!PUtils.waitCondition(PUtils.random(14000, 16000), PBanking::isBankOpen)) {
-                attempts++;
+                walkToBank();
                 return;
             }
             PUtils.sleepNormal(100, 600, 33, 200);
@@ -100,17 +100,17 @@ public class BankingState extends State {
             return;
         }
 
+        walkToBank();
+    }
+
+    public void walkToBank(){
         DaxWalker.getInstance().allowTeleports = settings.isTeleportWhileBanking();
         if (settings.getBankTile() == null && !DaxWalker.walkToBank(plugin.walkingCondition)) {
             attempts++;
-            return;
         } else if (settings.getBankTile() != null && !DaxWalker.walkTo(new RSTile(settings.getBankTile()), plugin.walkingCondition)) {
             attempts++;
-            return;
         } else {
             PUtils.waitCondition(PUtils.random(12000, 18000), () -> !PPlayer.isMoving());
-            attempts = 0;
-            return;
         }
     }
 
