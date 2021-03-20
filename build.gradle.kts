@@ -78,7 +78,7 @@ subprojects {
         compileOnly(group = "com.openosrs", name = "http-api", version = ProjectVersions.openosrsVersion)
         compileOnly(group = "com.openosrs", name = "runelite-api", version = ProjectVersions.openosrsVersion)
         compileOnly(group = "com.openosrs", name = "runelite-client", version = ProjectVersions.openosrsVersion)
-
+        compileOnly(group = "com.squareup.okhttp3", name = "okhttp", version = "3.7.0")
         compileOnly(group = "org.apache.commons", name = "commons-text", version = "1.9")
         compileOnly(group = "com.google.guava", name = "guava", version = "30.1-jre")
         compileOnly(group = "com.google.inject", name = "guice", version = "4.2.3", classifier = "no_aop")

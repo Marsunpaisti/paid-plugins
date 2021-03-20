@@ -4,20 +4,27 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.json.Json;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.json.JsonObject;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.json.JsonValue;
+import okhttp3.*;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class LicenseValidator {
+    private OkHttpClient httpClient;
     private Instant lastSuccessfulValidation;
     private Instant created;
     private int periodSeconds;
@@ -28,6 +35,11 @@ public class LicenseValidator {
     private boolean shouldStop;
 
     public LicenseValidator(String licenseType, int periodSeconds, String apiKey) {
+        httpClient = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .build();
         this.created = Instant.now();
         this.apiKey = apiKey;
         this.licenseType = licenseType;
@@ -147,51 +159,41 @@ public class LicenseValidator {
         }
     }
 
-    private JsonObject post(String url, JsonObject payload) {
-        HttpsURLConnection con = null;
-        try {
-            SSLContext ctx = SSLContext.getInstance("TLS");
-            SSLContext.setDefault(ctx);
-            URL startEndpoint = new URL(url);
-            con = (HttpsURLConnection) startEndpoint.openConnection();
-            con.setRequestMethod("POST");
-            con.addRequestProperty("content-type", "application/json");
-            con.setDoOutput(true);
-            OutputStream os = con.getOutputStream();
-            OutputStreamWriter osw = new OutputStreamWriter(os, Charset.forName("UTF-8"));
-            payload.writeTo(osw);
-            osw.flush();
-            osw.close();
-            con.connect();
-        } catch (Exception e){
-            log.error(e.toString());
-        }
+    private JsonObject post(String url, JsonObject payload){
+        HttpUrl httpUrl = HttpUrl.parse(url);
+        RequestBody body = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), payload.toString());
+        Request request = new Request.Builder()
+                .addHeader("accept", "application/json")
+                .addHeader("content-type", "application/json")
+                .url(httpUrl)
+                .post(body)
+                .build();
 
-        if (con == null) return null;
-        
-        String res;
-        BufferedInputStream bis = null;
-        try {
-            bis = new BufferedInputStream(con.getInputStream());
-        } catch (IOException e){
-            log.error(e.toString());
-            bis = new BufferedInputStream(con.getErrorStream());
-        }
-
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        try {
-            int resByte = bis.read();
-            while (resByte != -1){
-                buf.write((byte) resByte);
-                resByte = bis.read();
+        try (Response response = httpClient.newCall(request).execute())
+        {
+            ResponseBody responseBody = response.body();
+            if (responseBody == null)
+            {
+                log.error("Null response body from backend");
+                return null;
             }
-        } catch (Exception e){
-            log.error(e.toString());
-            return null;
+
+            String responseBodyString = responseBody.string();
+            if (responseBodyString.isEmpty())
+            {
+                log.error("Empty response body from backend");
+                return null;
+            }
+
+            return (JsonObject) Json.parse(responseBodyString);
+        }
+        catch (Exception e)
+        {
+            log.error("Error in POST: " + e.getMessage());
+            e.printStackTrace();
         }
 
-        res = buf.toString();
-        return (JsonObject)Json.parse(res);
+        return null;
     }
 
     // https://europe-west1-paistiplugins.cloudfunctions.net/startSession

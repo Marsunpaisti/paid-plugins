@@ -1,4 +1,4 @@
-version = "2.8.0"
+version = "2.9.1"
 
 project.extra["PluginName"] = "PFighter AIO"
 project.extra["PluginDescription"] = "Fully configurable all-in-one fighter - Premium version"
@@ -6,6 +6,7 @@ project.extra["PluginDescription"] = "Fully configurable all-in-one fighter - Pr
 dependencies {
     annotationProcessor(group = "org.projectlombok", name = "lombok", version = "1.18.12")
     annotationProcessor(group = "org.pf4j", name = "pf4j", version = "3.2.0")
+    compileOnly(group = "com.squareup.okhttp3", name = "okhttp", version = "3.7.0")
     compileOnly(group = "com.openosrs.externals", name = "paistisuite", version = "+")
 }
 
