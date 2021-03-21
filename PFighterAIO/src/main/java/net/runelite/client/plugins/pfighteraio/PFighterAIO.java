@@ -361,7 +361,11 @@ public class PFighterAIO extends PScript {
         if (event.getType() != ChatMessageType.PUBLICCHAT) return;
         if (event.getSender() != null && event.getSender().equalsIgnoreCase(PPlayer.get().getName())) return;
 
-        if (isRunning() && settings.isWorldhopIfPlayerTalks() && worldhopState != null) {
+        if (isRunning()
+                && settings.isWorldhopIfPlayerTalks()
+                && worldhopState != null
+                && settings.getSearchRadiusCenter() != null
+                && settings.getSearchRadiusCenter().distanceTo2D(PPlayer.getWorldLocation()) < 30) {
             worldhopState.setWorldhopRequested(true);
         }
     }

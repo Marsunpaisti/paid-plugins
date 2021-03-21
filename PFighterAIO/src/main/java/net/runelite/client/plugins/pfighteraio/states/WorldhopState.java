@@ -44,7 +44,7 @@ public class WorldhopState extends State {
         if (plugin.fightEnemiesState.inCombat()) return false;
         if (worldHopFailure) return false;
 
-        if (settings.isWorldhopIfTooManyPlayers()){
+        if (settings.isWorldhopIfTooManyPlayers() && settings.getSearchRadiusCenter().distanceTo2D(PPlayer.getWorldLocation()) < 30){
             Integer playerCount = PUtils.clientOnly(() -> new PlayerQuery().isWithinDistance(PPlayer.getWorldLocation(), 30).result(PUtils.getClient()).size(), "getPlayerCount");
             if (playerCount != null && playerCount >= settings.getWorldhopPlayerLimit() + 1){
                 isWorldhopRequested = true;
@@ -61,6 +61,10 @@ public class WorldhopState extends State {
             PUtils.sendGameMessage("World hopping failure. Too many attempts.");
             worldHopFailure = true;
             setWorldhopRequested(false);
+            return;
+        }
+        if (settings.isUseCannon() && settings.isCannonPlaced()){
+            plugin.setupCannonState.pickupCannon();
             return;
         }
         if (!PPlayer.isMoving()
