@@ -216,6 +216,10 @@ public class PFighterAIOSettings {
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean worldhopInSafespot;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean slayerTaskCompleted;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean bankForSlayerTask;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private int worldhopPlayerLimit;
 
 }

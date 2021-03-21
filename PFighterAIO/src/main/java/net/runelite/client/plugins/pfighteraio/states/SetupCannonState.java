@@ -181,7 +181,7 @@ public class SetupCannonState extends State {
 
     public boolean isCannonBroken() {
         PTileObject cannon = plugin.getCannon();
-        return cannon != null && cannon.getDef().getId() == 5;
+        return cannon != null && cannon.getDef().getId() == 14916;
     }
 
     public boolean canReachCannon(){

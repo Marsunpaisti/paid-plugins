@@ -27,6 +27,7 @@ public class DrinkPotionsState extends State {
     public boolean condition() {
         if (!settings.isUsePotions()) return false;
         if (plugin.fightEnemiesState.inCombat()) return false;
+        if (settings.getSearchRadiusCenter() != null && settings.getSearchRadiusCenter().distanceTo2D(PPlayer.getWorldLocation()) > 30) return false;
 
         if (PSkills.getCurrentLevel(Skill.ATTACK) < PSkills.getActualLevel(Skill.ATTACK) + nextDrinkBonus){
             if (PInventory.findItem(potionFilterForSkill(Skill.ATTACK)) != null) return true;

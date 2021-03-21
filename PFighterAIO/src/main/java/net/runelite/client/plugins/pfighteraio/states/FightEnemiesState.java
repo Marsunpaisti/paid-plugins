@@ -46,7 +46,7 @@ public class FightEnemiesState extends State {
         // No combat and no target
         if (!inCombat() && !isInteracting() ){
             log.info("No combat - Trying to attack new target");
-            PUtils.sleepNormal(500, 3500, 250, 800);
+            PUtils.sleepNormal(500, 3500, 300, 1100);
             if (plugin.isStopRequested()) return;
             if (inCombat() || isInteracting()) return;
             attackNewTarget();

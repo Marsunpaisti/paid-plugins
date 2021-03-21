@@ -389,11 +389,23 @@ public interface PFighterAIOConfig extends Config
     }
 
     @ConfigItem(
+            keyName = "bankForSlayerTask",
+            name = "Bank & stop after slayer task",
+            description = "Go to bank and stop script after task is finished",
+            section = bankingSection,
+            position = 88
+    )
+    default boolean bankForSlayerTask()
+    {
+        return false;
+    }
+
+    @ConfigItem(
             keyName = "teleportWhileBanking",
             name = "Use teleports to bank",
             description = "Uses available teleport items from inventory to get to bank and back",
             section = bankingSection,
-            position = 88
+            position = 89
     )
     default boolean teleportWhileBanking()
     {
@@ -405,7 +417,7 @@ public interface PFighterAIOConfig extends Config
             name = "Withdraw items list",
             description = "Items to withdraw when banking",
             section = bankingSection,
-            position = 88
+            position = 90
     )
     default String withdrawItems()
     {

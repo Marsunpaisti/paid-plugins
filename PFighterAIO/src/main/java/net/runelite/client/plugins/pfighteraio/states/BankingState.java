@@ -50,6 +50,11 @@ public class BankingState extends State {
             shouldBank = true;
         }
 
+        // Slayer task done
+        if (settings.isSlayerTaskCompleted() && settings.isBankForSlayerTask()){
+            shouldBank = true;
+        }
+
         return shouldBank;
     }
 
@@ -111,6 +116,10 @@ public class BankingState extends State {
             attempts++;
         } else {
             PUtils.waitCondition(PUtils.random(12000, 18000), () -> !PPlayer.isMoving());
+            if (settings.isBankForSlayerTask() && settings.isSlayerTaskCompleted()){
+                plugin.requestStop();
+                return;
+            }
         }
     }
 

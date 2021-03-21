@@ -214,6 +214,7 @@ public class PFighterAIO extends PScript {
         states.add(this.walkToFightAreaState);
         currentState = null;
         settings.setCurrentStateName("Null");
+        settings.setSlayerTaskCompleted(false);
 
         licenseValidator = new LicenseValidator("PFIGHTERAIO", 600, settings.getApiKey());
         validatorExecutor = Executors.newSingleThreadExecutor();
@@ -268,6 +269,7 @@ public class PFighterAIO extends PScript {
         settings.setBankForLoot(config.bankForLoot());
         settings.setBankingEnabled(config.enableBanking());
         settings.setTeleportWhileBanking(config.teleportWhileBanking());
+        settings.setBankForSlayerTask(config.bankForSlayerTask());
         ArrayList<BankingState.WithdrawItem> itemsToWithdraw = new ArrayList<BankingState.WithdrawItem>();
         try {
             String[] split = PUtils.parseNewlineSeparated(config.withdrawItems());
@@ -459,9 +461,20 @@ public class PFighterAIO extends PScript {
         }
     }
 
+    public void handleSlayerTaskChatMessage(ChatMessage event){
+        String SLAYER_MSG = "return to a Slayer master";
+        String SLAYER_BOOST_MSG = "You'll be eligible to earn reward points if you complete tasks";
+        if (event.getMessage() != null && event.getMessage().contains(SLAYER_MSG) || event.getMessage().contains(SLAYER_BOOST_MSG) &&
+                event.getType() == ChatMessageType.GAMEMESSAGE)
+        {
+            settings.setSlayerTaskCompleted(true);
+        }
+    }
+
     @Subscribe
     public void onChatMessage(ChatMessage event)
     {
+        handleSlayerTaskChatMessage(event);
         handleWorldHopOnChatMessage(event);
         handleChatMessageCannonVars(event);
     }
@@ -495,7 +508,7 @@ public class PFighterAIO extends PScript {
         WorldPoint searchPos;
         WorldPoint currentCannonPos = settings.getCurrentCannonPos();
         searchPos = new WorldPoint(currentCannonPos.getX(), currentCannonPos.getY(), currentCannonPos.getPlane());
-        return PObjects.findObject(Filters.Objects.idEquals(5,6,7,8,9).and((ob) -> ob.getWorldLocation().distanceTo(searchPos) <= 2));
+        return PObjects.findObject(Filters.Objects.idEquals(5,6,7,8,9,14916).and((ob) -> ob.getWorldLocation().distanceTo(searchPos) <= 2));
     }
 
     @Override
