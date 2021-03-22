@@ -67,13 +67,24 @@ public interface PFighterAIOConfig extends Config
     {
         return true;
     }
+    @ConfigItem(
+            keyName = "useSlayerItems",
+            name = "Use slayer items",
+            description = "Uses slayer items on enemies.",
+            section = targetingsection,
+            position = 19
+    )
+    default boolean useSlayerItems()
+    {
+        return false;
+    }
 
     @ConfigItem(
             keyName = "setFightAreaButton",
             name = "Set fighting area",
             description = "Set fighting area to where you are standing",
             section = targetingsection,
-            position = 19
+            position = 20
     )
     default Button setFightAreaButton()
     {
@@ -83,7 +94,7 @@ public interface PFighterAIOConfig extends Config
     @ConfigSection(
             name = "Eating",
             description = "Enter food names/ids to eat",
-            position = 15,
+            position = 21,
             closedByDefault = true,
             keyName = "eatingsection"
     )
@@ -94,7 +105,7 @@ public interface PFighterAIOConfig extends Config
             name = "",
             description = "Food names or IDs to eat",
             section = eatingsection,
-            position = 21
+            position = 22
     )
     default String foodNames()
     {

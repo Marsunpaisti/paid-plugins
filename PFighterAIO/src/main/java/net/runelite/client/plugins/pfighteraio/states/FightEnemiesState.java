@@ -1,22 +1,37 @@
 package net.runelite.client.plugins.pfighteraio.states;
 
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.NPC;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.client.plugins.paistisuite.api.PInteraction;
-import net.runelite.client.plugins.paistisuite.api.PPlayer;
-import net.runelite.client.plugins.paistisuite.api.PUtils;
-import net.runelite.client.plugins.paistisuite.api.PWalking;
+import net.runelite.api.util.Text;
+import net.runelite.client.game.NPCManager;
+import net.runelite.client.plugins.paistisuite.PaistiSuite;
+import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
+import net.runelite.client.plugins.paistisuite.api.types.Filters;
+import net.runelite.client.plugins.paistisuite.api.types.PItem;
 import net.runelite.client.plugins.pfighteraio.PFighterAIO;
 import net.runelite.client.plugins.pfighteraio.PFighterAIOSettings;
+import net.runelite.http.api.hiscore.HiscoreResult;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static java.util.Map.entry;
 
 @Slf4j
 public class FightEnemiesState extends State {
+    public static Map<String, String> slayerItems = Map.ofEntries(
+            entry("Lizard", "Ice cooler"),
+            entry("Desert Lizard", "Ice cooler"),
+            entry("Small Lizard", "Ice cooler"),
+            entry("Rockslug", "Bag of salt")
+
+    );
     public FightEnemiesState(PFighterAIO plugin, PFighterAIOSettings settings){
         super(plugin, settings);
     }
@@ -78,12 +93,40 @@ public class FightEnemiesState extends State {
             return;
         }
 
+
+        // Slayer items
+        if (getCurrentTarget() != null && settings.isUseSlayerItems()){
+            int maxHp = getMaxHp(getCurrentTarget());
+            int exactHp = getExactHp(getCurrentTarget().getHealthRatio(), getCurrentTarget().getHealthScale(), maxHp);
+            if (exactHp <= 3 && exactHp != -1){
+                PUtils.sleepNormal(200, 1500, 250, 500);
+                useSlayerItemOnTarget();
+                return;
+            }
+        }
+
         // Current target is not suitable anymore
         if (getCurrentTarget() != null && !isCurrentTargetValid() && !getCurrentTarget().isDead()){
             log.info("Current target not valid - Trying to attack new target");
             PUtils.sleepNormal(300, 1500, 250, 400);
             if (plugin.isStopRequested()) return;
             attackNewTarget();
+        }
+    }
+
+    public void useSlayerItemOnTarget(){
+        if (getCurrentTarget() == null) return;
+        String itemName = slayerItems.getOrDefault(getCurrentTarget().getName(), null);
+        if (itemName != null){
+            log.info("Trying to use slayer item on target");
+            PItem slayerItem = PInventory.findItem(Filters.Items.nameEquals(itemName));
+            if (slayerItem != null && getCurrentTarget() != null){
+                log.info("Found slayer item. Using " + slayerItem.getName() + " on " + getCurrentTarget().getName());
+                PInteraction.useItemOnNpc(slayerItem, getCurrentTarget());
+                PUtils.sleepNormal(650, 1500, 150, 800);
+            } else {
+                log.info("No slayer item found for target");
+            }
         }
     }
 
@@ -164,8 +207,61 @@ public class FightEnemiesState extends State {
         return npc != null;
     }
 
+    int getMaxHp(Actor actor)
+    {
+        if (actor instanceof NPC)
+        {
+            return PaistiSuite.getInstance().npcManager.getHealth(((NPC) actor).getId());
+        }
+
+        return -1;
+    }
+
+    static int getExactHp(int ratio, int health, int maxHp)
+    {
+        if (ratio < 0 || health <= 0 || maxHp == -1)
+        {
+            return -1;
+        }
+
+        int exactHealth = 0;
+
+        // This is the reverse of the calculation of healthRatio done by the server
+        // which is: healthRatio = 1 + (healthScale - 1) * health / maxHealth (if health > 0, 0 otherwise)
+        // It's able to recover the exact health if maxHealth <= healthScale.
+        if (ratio > 0)
+        {
+            int minHealth = 1;
+            int maxHealth;
+            if (health > 1)
+            {
+                if (ratio > 1)
+                {
+                    // This doesn't apply if healthRatio = 1, because of the special case in the server calculation that
+                    // health = 0 forces healthRatio = 0 instead of the expected healthRatio = 1
+                    minHealth = (maxHp * (ratio - 1) + health - 2) / (health - 1);
+                }
+                maxHealth = (maxHp * ratio - 1) / (health - 1);
+                if (maxHealth > maxHp)
+                {
+                    maxHealth = maxHp;
+                }
+            }
+            else
+            {
+                // If healthScale is 1, healthRatio will always be 1 unless health = 0
+                // so we know nothing about the upper limit except that it can't be higher than maxHealth
+                maxHealth = maxHp;
+            }
+            // Take the average of min and max possible healths
+            exactHealth = (minHealth + maxHealth + 1) / 2;
+        }
+
+        return exactHealth;
+    }
+
     @Override
     public boolean condition() {
-        return getNewTarget() != null;
+        return getNewTarget() != null || inCombat();
     }
 }

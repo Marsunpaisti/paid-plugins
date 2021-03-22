@@ -233,6 +233,7 @@ public class PFighterAIO extends PScript {
         settings.setEnablePathfind(config.enablePathfind());
         settings.setValidTargetFilter(createValidTargetFilter(false));
         settings.setValidTargetFilterWithoutDistance(createValidTargetFilter(true));
+        settings.setUseSlayerItems(config.useSlayerItems());
 
         // Eating
         log.info("Reading eating settings");
@@ -312,17 +313,17 @@ public class PFighterAIO extends PScript {
 
         // Stored tiles
         log.info("Reading stored tiles");
-        if (settings.getSearchRadiusCenter() == null){
+        if (settings.getSearchRadiusCenter() == null && config.storedFightTile() != null ){
             usingSavedFightTile = true;
             settings.setSearchRadiusCenter(config.storedFightTile());
         }
 
-        if (settings.getSafeSpot() == null && config.storedFightTile() != null && config.storedSafeSpotTile().distanceTo2D(config.storedFightTile()) < 50) {
+        if (settings.getSafeSpot() == null && config.storedFightTile() != null && config.storedSafeSpotTile().distanceTo2D(settings.getSearchRadiusCenter()) < 50) {
             settings.setSafeSpot(config.storedSafeSpotTile());
             usingSavedSafeSpot = true;
         }
 
-        if (settings.getCannonTile() == null && settings.isUseCannon() && config.storedCannonTile() != null && config.storedCannonTile().distanceTo2D(config.storedFightTile()) < 50) {
+        if (settings.getCannonTile() == null && settings.isUseCannon() && config.storedCannonTile() != null && config.storedCannonTile().distanceTo2D(settings.getSearchRadiusCenter()) < 50) {
             usingSavedCannonTile = true;
             settings.setCannonTile(config.storedCannonTile());
         }
@@ -575,11 +576,9 @@ public class PFighterAIO extends PScript {
     }
 
     private void handleLevelUps(){
-        if (PDialogue.isConversationWindowUp()){
-            List<Widget> options = PDialogue.getDialogueOptions();
-            if (options.stream().anyMatch(o -> o.getText().contains("Click here to continue"))){
-                PDialogue.clickHereToContinue();
-            }
+        if (PWidgets.isSubstantiated(WidgetInfo.LEVEL_UP)){
+            PDialogue.clickHereToContinue();
+            PUtils.sleepNormal(600, 1200);
         }
     }
 

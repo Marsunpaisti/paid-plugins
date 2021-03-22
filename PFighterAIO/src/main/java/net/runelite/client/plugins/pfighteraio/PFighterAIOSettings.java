@@ -220,6 +220,8 @@ public class PFighterAIOSettings {
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean bankForSlayerTask;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean useSlayerItems;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private int worldhopPlayerLimit;
 
 }
