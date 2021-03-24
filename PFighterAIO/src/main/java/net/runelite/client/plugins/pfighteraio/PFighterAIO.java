@@ -577,7 +577,10 @@ public class PFighterAIO extends PScript {
 
     private void handleLevelUps(){
         if (PWidgets.isSubstantiated(WidgetInfo.LEVEL_UP)){
+            PUtils.sleepNormal(300, 800);
             PDialogue.clickHereToContinue();
+            lastAntiAfk = System.currentTimeMillis();
+            antiAfkDelay = PUtils.randomNormal(240000, 295000);
             PUtils.sleepNormal(600, 1200);
         }
     }

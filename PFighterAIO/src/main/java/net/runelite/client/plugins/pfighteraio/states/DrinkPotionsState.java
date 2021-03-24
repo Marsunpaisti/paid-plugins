@@ -87,7 +87,7 @@ public class DrinkPotionsState extends State {
         }
         if (potion != null && PInteraction.item(potion, "Drink")) {
             nextDrinkBonus = PUtils.random(settings.getMinPotionBoost(), settings.getMaxPotionBoost());
-            PUtils.sleepNormal(700, 1200);
+            PUtils.sleepNormal(1200, 1800);
         }
     }
 }
