@@ -21,6 +21,7 @@ import net.runelite.client.plugins.paistisuite.PaistiSuite;
 import net.runelite.client.plugins.paistisuite.api.*;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.WalkingCondition;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.api_lib.DaxWalker;
+import net.runelite.client.plugins.paistisuite.api.WebWalker.shared.helpers.magic.RuneElement;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.walker_engine.local_pathfinding.Reachable;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.Keyboard;
 import net.runelite.client.plugins.paistisuite.api.WebWalker.wrappers.RSTile;
@@ -717,6 +718,11 @@ public class PFighterAIO extends PScript {
     private synchronized Predicate<PGroundItem> createValidLootFilter(){
         Predicate<PGroundItem> filter = Filters.GroundItems.nameContainsOrIdEquals(settings.getLootNames());
         if (settings.getLootGEValue() > 0) filter = filter.or(Filters.GroundItems.SlotPriceAtLeast(settings.getLootGEValue()));
+        if (settings.isEnableAlching()) {
+            filter = filter.or(
+                    i -> RuneElement.FIRE.getCount() >= 5 && RuneElement.NATURE.getCount() >= 1 && PSkills.getCurrentLevel(Skill.MAGIC) >= 55 && i.getHaPrice() >= settings.getAlchMinHAValue()
+            );
+        }
         filter = filter.and(item -> item.getLocation().distanceToHypotenuse(settings.getSearchRadiusCenter()) <= (settings.getSearchRadius()+2));
         filter = filter.and(item -> lootItemsState.haveSpaceForItem(item));
         if (config.lootOwnKills()) filter = filter.and(item -> item.getLootType() == PGroundItem.LootType.PVM);
