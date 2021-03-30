@@ -45,6 +45,11 @@ public class BankingState extends State {
             shouldBank = true;
         }
 
+        // No prayer pots -> go bank
+        if (settings.isBankForFood() && PInventory.findAllItems(Filters.Items.nameContains("Prayer potion")).size() == 0){
+            shouldBank = true;
+        }
+
         // No inventory space & no food to eat for space -> go bank
         if (settings.isBankForLoot() && PInventory.getEmptySlots() <= settings.getReservedInventorySlots() && (!settings.isEatFoodForLoot() || PInventory.findItem(settings.getValidFoodFilter()) == null)){
             shouldBank = true;

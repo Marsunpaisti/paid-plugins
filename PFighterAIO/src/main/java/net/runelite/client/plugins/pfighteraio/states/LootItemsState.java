@@ -85,8 +85,6 @@ public class LootItemsState extends State {
                 if (PUtils.waitCondition(PUtils.random(1900, 2900), () -> PInventory.getCount(target.getName()) > countBefore)) {
                     if (plugin.isStopRequested()) return;
                     // Maybe alch item
-                    log.info("fire: " + RuneElement.FIRE.getCount());
-                    log.info("nat: " + RuneElement.NATURE.getCount());
                     if (settings.isEnableAlching()) {
                         if (RuneElement.FIRE.getCount() < 5 || RuneElement.NATURE.getCount() < 1 || PSkills.getCurrentLevel(Skill.MAGIC) < 55) {
                             log.info("Cannot alch item, no runes left or magic level is too low");

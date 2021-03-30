@@ -192,9 +192,17 @@ public class PFighterAIOSettings {
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private int currentCannonWorld;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean normalQuickPrayers;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean flickQuickPrayers;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean assistFlickPrayers;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean drinkPrayerPotions;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private int minPrayerPotPoints;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private int maxPrayerPotPoints;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean enableAlching;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
@@ -219,6 +227,8 @@ public class PFighterAIOSettings {
     private boolean slayerTaskCompleted;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean bankForSlayerTask;
+    @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
+    private boolean bankForPrayerPots;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})
     private boolean useSlayerItems;
     @Getter(onMethod_={@Synchronized}) @Setter(onMethod_={@Synchronized})

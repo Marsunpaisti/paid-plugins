@@ -29,7 +29,8 @@ public class FightEnemiesState extends State {
             entry("Lizard", "Ice cooler"),
             entry("Desert Lizard", "Ice cooler"),
             entry("Small Lizard", "Ice cooler"),
-            entry("Rockslug", "Bag of salt")
+            entry("Rockslug", "Bag of salt"),
+            entry("Giant rockslug", "Bag of salt")
 
     );
     public FightEnemiesState(PFighterAIO plugin, PFighterAIOSettings settings){
@@ -37,6 +38,7 @@ public class FightEnemiesState extends State {
     }
     public long targetClickedTimestamp = System.currentTimeMillis();
     public NPC lastTarget;
+    public boolean usedSlayerItem = false;
 
     @Override
     public String getName() {
@@ -46,6 +48,19 @@ public class FightEnemiesState extends State {
     @Override
     public void loop() {
         super.loop();
+
+        // Slayer items
+        NPC slayerItemTarget = getCurrentTarget() != null ? getCurrentTarget() : lastTarget;
+        if (!usedSlayerItem && slayerItemTarget != null && settings.isUseSlayerItems() && slayerItems.getOrDefault((slayerItemTarget.getName() != null ? slayerItemTarget.getName() : ""), null) != null){
+            int maxHp = getMaxHp(slayerItemTarget);
+            int exactHp = getExactHp(slayerItemTarget.getHealthRatio(), slayerItemTarget.getHealthScale(), maxHp);
+            if ((exactHp <= 3 && exactHp != -1) || slayerItemTarget.isDead()){
+                log.info("Using slayer item");
+                PUtils.sleepNormal(200, 1500, 100, 350);
+                useSlayerItemOnTarget(slayerItemTarget);
+                return;
+            }
+        }
 
         // In combat and outside safespot
         if (inCombat() && settings.isSafeSpotForCombat() && PPlayer.location().distanceTo(settings.getSafeSpot()) > 0 && PPlayer.location().distanceTo2D(settings.getSafeSpot()) < 40) {
@@ -61,7 +76,7 @@ public class FightEnemiesState extends State {
         // No combat and no target
         if (!inCombat() && !isInteracting() ){
             log.info("No combat - Trying to attack new target");
-            PUtils.sleepNormal(500, 3500, 300, 1100);
+            PUtils.sleepNormal(500, 3500, 300, 800);
             if (plugin.isStopRequested()) return;
             if (inCombat() || isInteracting()) return;
             attackNewTarget();
@@ -93,18 +108,6 @@ public class FightEnemiesState extends State {
             return;
         }
 
-
-        // Slayer items
-        if (getCurrentTarget() != null && settings.isUseSlayerItems()){
-            int maxHp = getMaxHp(getCurrentTarget());
-            int exactHp = getExactHp(getCurrentTarget().getHealthRatio(), getCurrentTarget().getHealthScale(), maxHp);
-            if (exactHp <= 3 && exactHp != -1){
-                PUtils.sleepNormal(200, 1500, 250, 500);
-                useSlayerItemOnTarget();
-                return;
-            }
-        }
-
         // Current target is not suitable anymore
         if (getCurrentTarget() != null && !isCurrentTargetValid() && !getCurrentTarget().isDead()){
             log.info("Current target not valid - Trying to attack new target");
@@ -114,15 +117,16 @@ public class FightEnemiesState extends State {
         }
     }
 
-    public void useSlayerItemOnTarget(){
-        if (getCurrentTarget() == null) return;
-        String itemName = slayerItems.getOrDefault(getCurrentTarget().getName(), null);
+    public void useSlayerItemOnTarget(NPC target){
+        if (target == null) return;
+        String itemName = slayerItems.getOrDefault(target.getName(), null);
         if (itemName != null){
             log.info("Trying to use slayer item on target");
             PItem slayerItem = PInventory.findItem(Filters.Items.nameEquals(itemName));
-            if (slayerItem != null && getCurrentTarget() != null){
-                log.info("Found slayer item. Using " + slayerItem.getName() + " on " + getCurrentTarget().getName());
-                PInteraction.useItemOnNpc(slayerItem, getCurrentTarget());
+            if (slayerItem != null){
+                log.info("Found slayer item. Using " + slayerItem.getName() + " on " + target.getName());
+                PInteraction.useItemOnNpc(slayerItem, target);
+                usedSlayerItem = true;
                 PUtils.sleepNormal(650, 1500, 150, 800);
             } else {
                 log.info("No slayer item found for target");
@@ -135,6 +139,7 @@ public class FightEnemiesState extends State {
         if (PInteraction.npc(target, "Attack")) {
             targetClickedTimestamp = System.currentTimeMillis();
             lastTarget = target;
+            usedSlayerItem = false;
             return PUtils.waitCondition(PUtils.random(700, 1300), this::isInteracting);
         }
 
@@ -145,6 +150,7 @@ public class FightEnemiesState extends State {
         if (lastTarget == null || !settings.getValidTargetFilter().test(lastTarget)) return false;
         if (PInteraction.npc(lastTarget, "Attack")) {
             targetClickedTimestamp = System.currentTimeMillis();
+            usedSlayerItem = false;
             return PUtils.waitCondition(PUtils.random(700, 1300), this::isInteracting);
         }
         return false;

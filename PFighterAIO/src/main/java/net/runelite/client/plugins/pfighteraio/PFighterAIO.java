@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
-import net.runelite.api.queries.NPCQuery;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.config.ConfigManager;
@@ -42,11 +41,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Extension
 @PluginDependency(PaistiSuite.class)
@@ -65,6 +62,7 @@ public class PFighterAIO extends PScript {
     private static boolean skipProjectileCheckThisTick = false;
     int nextRunAt = PUtils.random(25,65);
     int nextEatAt;
+    int nextPrayerPotAt;
     long lastAntiAfk;
     long antiAfkDelay = PUtils.randomNormal(240000, 295000);
     private boolean usingSavedFightTile;
@@ -114,7 +112,7 @@ public class PFighterAIO extends PScript {
         overlayManager.add(minimapoverlay);
     }
 
-    public boolean shouldPray() {
+    public boolean shouldPrayerFlick() {
         if (isRunning()){
             if (PPlayer.get().getInteracting() != null){
                 if (settings.getValidTargetFilterWithoutDistance().test((NPC)PPlayer.get().getInteracting())) {
@@ -138,11 +136,9 @@ public class PFighterAIO extends PScript {
         return false;
     }
 
-    @Subscribe
-    private void onGameTick(GameTick event){
-        skipProjectileCheckThisTick = false;
+    private void handlePrayerFlicking(){
         if (((isRunning() && settings.isFlickQuickPrayers()) || settings.isAssistFlickPrayers()) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
-            if (shouldPray()){
+            if (shouldPrayerFlick()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
                     prayerFlickExecutor.submit(() -> {
                         PUtils.sleepNormal(25, 240);
@@ -162,12 +158,58 @@ public class PFighterAIO extends PScript {
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) != 0){
                     prayerFlickExecutor.submit(() -> {
                         PUtils.sleepNormal(100, 350);
-                            Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
-                            PInteraction.widget(quickPray, "Deactivate");
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Deactivate");
                     });
                 }
             }
         }
+    }
+
+    private void handleNormalPraying(){
+        if (isRunning() && settings.isNormalQuickPrayers() && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
+            // On break, not in combat = disable prayer
+            if (takeBreaksState.isCurrentlyTakingBreak()){
+                if (!fightEnemiesState.inCombat() && PVars.getVarbit(Varbits.QUICK_PRAYER) == 1){
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(100, 350);
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Deactivate");
+                    });
+                } else if (fightEnemiesState.inCombat() && PVars.getVarbit(Varbits.QUICK_PRAYER) == 0){
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(100, 350);
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Activate");
+                    });
+                }
+                return;
+            }
+
+            // Otherwise enable prayer in fight radius
+            if (PPlayer.getWorldLocation().distanceTo2DHypotenuse(settings.getSearchRadiusCenter()) <= settings.getSearchRadius()+12){
+                if (PVars.getVarbit(Varbits.QUICK_PRAYER) == 0){
+                    prayerFlickExecutor.submit(() -> {
+                        PUtils.sleepNormal(100, 350);
+                        Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                        PInteraction.widget(quickPray, "Activate");
+                    });
+                }
+            } else if (PVars.getVarbit(Varbits.QUICK_PRAYER) == 1){
+                prayerFlickExecutor.submit(() -> {
+                    PUtils.sleepNormal(100, 350);
+                    Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
+                    PInteraction.widget(quickPray, "Deactivate");
+                });
+            }
+        }
+    }
+
+    @Subscribe
+    private void onGameTick(GameTick event){
+        skipProjectileCheckThisTick = false;
+        handlePrayerFlicking();
+        handleNormalPraying();
     }
 
     @Subscribe
@@ -240,7 +282,7 @@ public class PFighterAIO extends PScript {
         log.info("Reading eating settings");
         settings.setFoodsToEat(PUtils.parseCommaSeparated(config.foodNames()));
         settings.setValidFoodFilter(createValidFoodFilter());
-        settings.setMaxEatHp(Math.min(PSkills.getActualLevel(Skill.HITPOINTS), config.maxEatHP()));
+        settings.setMaxEatHp(Math.min(PSkills.getActualLevel(Skill.HITPOINTS)-1, config.maxEatHP()));
         settings.setMinEatHp( Math.min(config.minEatHP(), settings.getMaxEatHp()));
         nextEatAt = (int)PUtils.randomNormal(settings.getMinEatHp(), settings.getMaxEatHp());
         settings.setStopWhenOutOfFood(config.stopWhenOutOfFood());
@@ -268,6 +310,7 @@ public class PFighterAIO extends PScript {
             settings.setBankTile(config.bankLocation().getWorldPoint());
         }
         settings.setBankForFood(config.bankForFood());
+        settings.setBankForPrayerPots(config.bankForPrayerPots());
         settings.setBankForLoot(config.bankForLoot());
         settings.setBankingEnabled(config.enableBanking());
         settings.setTeleportWhileBanking(config.teleportWhileBanking());
@@ -299,8 +342,13 @@ public class PFighterAIO extends PScript {
 
         // Prayer
         log.info("Reading prayer settings");
+        settings.setDrinkPrayerPotions(config.drinkPrayerPotions());
+        settings.setMaxPrayerPotPoints(Math.min(PSkills.getActualLevel(Skill.PRAYER)-1, config.maxPrayerPotPoints()));
+        settings.setMinPrayerPotPoints( Math.min(config.minPrayerPotPoints(), settings.getMaxPrayerPotPoints()));
+        nextPrayerPotAt = (int)PUtils.randomNormal(settings.getMinPrayerPotPoints(), settings.getMaxPrayerPotPoints());
         settings.setFlickQuickPrayers(config.flickQuickPrayers());
         settings.setAssistFlickPrayers(config.assistFlickPrayers());
+        settings.setNormalQuickPrayers(config.normalQuickPrayers());
         if (settings.isFlickQuickPrayers() || settings.isAssistFlickPrayers()) {
             if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
         }
@@ -553,13 +601,18 @@ public class PFighterAIO extends PScript {
         if (PUtils.getClient().getGameState() != GameState.LOGGED_IN) return;
 
         if (!checkValidator()) return;
-        if (handleStopConditions()) return;
+        if (isStopRequested()) return;
         handleEating();
+        if (isStopRequested()) return;
+        if (handleStopConditions()) return;
+        handlePrayerPotions();
         if (isStopRequested()) return;
         handleRun();
         if (isStopRequested()) return;
         handleAntiAfk();
         handleLevelUps();
+        if (isStopRequested()) return;
+        if (handleStopConditions()) return;
 
         previousState = currentState;
         currentState = getValidState();
@@ -651,7 +704,7 @@ public class PFighterAIO extends PScript {
             NPC targetBeforeEating = null;
             if (currentState == fightEnemiesState
                     && fightEnemiesState.inCombat()
-                    && settings.getValidTargetFilter().test((NPC)PPlayer.get().getInteracting())
+                    && settings.getValidTargetFilterWithoutDistance().test((NPC)PPlayer.get().getInteracting())
             ) {
                 targetBeforeEating = (NPC)PPlayer.get().getInteracting();
             }
@@ -664,6 +717,40 @@ public class PFighterAIO extends PScript {
                 }
             }
         }
+        return false;
+    }
+
+    private boolean handlePrayerPotions(){
+        if (PSkills.getCurrentLevel(Skill.PRAYER) <= nextPrayerPotAt){
+            nextPrayerPotAt = (int)PUtils.randomNormal(settings.getMinPrayerPotPoints(), settings.getMaxPrayerPotPoints());
+            log.info("Next prayer potion at " + nextPrayerPotAt);
+            NPC targetBeforePotion = null;
+            if (currentState == fightEnemiesState
+                    && fightEnemiesState.inCombat()
+                    && settings.getValidTargetFilterWithoutDistance().test((NPC)PPlayer.get().getInteracting())
+            ) {
+                targetBeforePotion = (NPC)PPlayer.get().getInteracting();
+            }
+
+            boolean success = drinkPrayerPot();
+            if (success && targetBeforePotion != null && PUtils.random(1,5) <= 4) {
+                log.info("Re-targeting current enemy after eating");
+                if (PInteraction.npc(targetBeforePotion, "Attack")){
+                    PUtils.sleepNormal(100, 700);
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean drinkPrayerPot(){
+        PItem pot = PInventory.findItem(Filters.Items.nameContains("Prayer potion"));
+        if (PInteraction.item(pot, "Drink")){
+            log.info("Drank prayer potion");
+            PUtils.sleepNormal(300, 1000);
+            return true;
+        }
+        log.info("Failed to drink prayer potion!");
         return false;
     }
 
@@ -684,6 +771,7 @@ public class PFighterAIO extends PScript {
         if (PUtils.getClient().getGameState() != GameState.LOGGED_IN && PUtils.getClient().getGameState() != GameState.LOADING) return WalkingCondition.State.EXIT_OUT_WALKER_FAIL;
         handleRun();
         handleEating();
+        handlePrayerPotions();
         return WalkingCondition.State.CONTINUE_WALKER;
     };
 

@@ -25,6 +25,10 @@ public class TakeBreaksState extends State {
         return this.currentlyTakingBreak || plugin.breakScheduler.shouldTakeBreak();
     }
 
+    public boolean isCurrentlyTakingBreak(){
+        return this.currentlyTakingBreak;
+    }
+
     @Override
     public String getName() {
         return "Taking a break";
@@ -55,6 +59,7 @@ public class TakeBreaksState extends State {
         if (this.currentlyTakingBreak && settings.isSafeSpotForBreaks() && settings.getSafeSpot() != null && PPlayer.distanceTo(settings.getSafeSpot()) < 40 && PPlayer.distanceTo(settings.getSafeSpot()) > 0 && !PPlayer.isMoving()){
             if (Reachable.getMap().canReach(settings.getSafeSpot())){
                 PWalking.sceneWalk(settings.getSafeSpot());
+                PUtils.sleepNormal(1200, 1900);
             } else {
                 DaxWalker.getInstance().allowTeleports = false;
                 DaxWalker.walkTo(new RSTile(settings.getSafeSpot()));

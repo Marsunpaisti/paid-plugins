@@ -380,9 +380,21 @@ public interface PFighterAIOConfig extends Config
             name = "Bank when out of food",
             description = "Bank when out of food",
             section = bankingSection,
-            position = 86
+            position = 87
     )
     default boolean bankForFood()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "bankForPrayerPots",
+            name = "Bank when out of prayer pots",
+            description = "Bank when out of prayer potions",
+            section = bankingSection,
+            position = 88
+    )
+    default boolean bankForPrayerPots()
     {
         return false;
     }
@@ -392,7 +404,7 @@ public interface PFighterAIOConfig extends Config
             name = "Bank when inventory is full",
             description = "Bank when inventory is full",
             section = bankingSection,
-            position = 87
+            position = 89
     )
     default boolean bankForLoot()
     {
@@ -404,7 +416,7 @@ public interface PFighterAIOConfig extends Config
             name = "Bank & stop after slayer task",
             description = "Go to bank and stop script after task is finished",
             section = bankingSection,
-            position = 88
+            position = 90
     )
     default boolean bankForSlayerTask()
     {
@@ -416,7 +428,7 @@ public interface PFighterAIOConfig extends Config
             name = "Use teleports to bank",
             description = "Uses available teleport items from inventory to get to bank and back",
             section = bankingSection,
-            position = 89
+            position = 91
     )
     default boolean teleportWhileBanking()
     {
@@ -428,7 +440,7 @@ public interface PFighterAIOConfig extends Config
             name = "Withdraw items list",
             description = "Items to withdraw when banking",
             section = bankingSection,
-            position = 90
+            position = 92
     )
     default String withdrawItems()
     {
@@ -492,7 +504,6 @@ public interface PFighterAIOConfig extends Config
         return 15;
     }
 
-
     @ConfigItem(
             keyName = "minBreakDurationSeconds",
             name = "Min Duration (seconds)",
@@ -521,16 +532,71 @@ public interface PFighterAIOConfig extends Config
     @ConfigSection(
             name = "Prayer",
             description = "Prayer settings",
-            position = 160,
+            position = 154,
             closedByDefault = true,
             keyName = "prayerSection"
     )
     String prayerSection = "Prayer settings";
+
+    @ConfigItem(
+            keyName = "drinkPrayerPotions",
+            name = "Drink prayer potions",
+            description = "Enable drinking prayer potions",
+            section = prayerSection,
+            position = 155
+    )
+    default boolean drinkPrayerPotions()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "minPrayerPotPoints",
+            name = "Prayer potion min",
+            description = "Minimum prayer points to drink prayer pot at",
+            section = prayerSection,
+            position = 158,
+            hidden = true,
+            unhide = "drinkPrayerPotions"
+    )
+    default int minPrayerPotPoints()
+    {
+        return 2;
+    }
+
+    @ConfigItem(
+            keyName = "maxPrayerPotPoints",
+            name = "Prayer potion max",
+            description = "Highest prayer that to drink prayer pot at (random between min and max prayer potion range)",
+            section = prayerSection,
+            position = 159,
+            hidden = true,
+            unhide = "drinkPrayerPotions"
+    )
+    default int maxPrayerPotPoints()
+    {
+        return 10;
+    }
+
+    @ConfigItem(
+            keyName = "normalQuickPrayers",
+            name = "Enable quick prayers",
+            description = "Normally enables quick prayers in fight area (no flicking)",
+            section = prayerSection,
+            disabledBy = "flickQuickPrayers | assistFlickPrayers",
+            position = 160
+    )
+    default boolean normalQuickPrayers()
+    {
+        return false;
+    }
+
     @ConfigItem(
             keyName = "flickQuickPrayers",
             name = "Flick quick prayers in combat",
             description = "Makes bot flick prayers when in combat with targets",
             section = prayerSection,
+            disabledBy = "normalQuickPrayers",
             position = 161
     )
     default boolean flickQuickPrayers()
@@ -543,6 +609,7 @@ public interface PFighterAIOConfig extends Config
             name = "Use as combat assistant",
             description = "Flicks quick prayers for you when script is not on, so you can play manually with prayer flick assist",
             section = prayerSection,
+            disabledBy = "normalQuickPrayers",
             position = 162
     )
     default boolean assistFlickPrayers()
