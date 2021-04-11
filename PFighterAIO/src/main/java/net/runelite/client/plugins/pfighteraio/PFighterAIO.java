@@ -57,7 +57,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @Singleton
 public class PFighterAIO extends PScript {
-    private ExecutorService prayerFlickExecutor;
+    private ExecutorService prayerExecutor;
     private static final Pattern NUMBER_PATTERN = Pattern.compile("([0-9]+)");
     private static boolean skipProjectileCheckThisTick = false;
     int nextRunAt = PUtils.random(25,65);
@@ -140,7 +140,7 @@ public class PFighterAIO extends PScript {
         if (((isRunning() && settings.isFlickQuickPrayers()) || settings.isAssistFlickPrayers()) && PSkills.getCurrentLevel(Skill.PRAYER) > 0) {
             if (shouldPrayerFlick()){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) > 0){
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(25, 240);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Deactivate");
@@ -148,7 +148,7 @@ public class PFighterAIO extends PScript {
                         PInteraction.widget(quickPray, "Activate");
                     });
                 } else {
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(25, 240);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Activate");
@@ -156,7 +156,7 @@ public class PFighterAIO extends PScript {
                 }
             } else {
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) != 0){
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(100, 350);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Deactivate");
@@ -171,13 +171,13 @@ public class PFighterAIO extends PScript {
             // On break, not in combat = disable prayer
             if (takeBreaksState.isCurrentlyTakingBreak()){
                 if (!fightEnemiesState.inCombat() && PVars.getVarbit(Varbits.QUICK_PRAYER) == 1){
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(100, 350);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Deactivate");
                     });
                 } else if (fightEnemiesState.inCombat() && PVars.getVarbit(Varbits.QUICK_PRAYER) == 0){
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(100, 350);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Activate");
@@ -189,14 +189,14 @@ public class PFighterAIO extends PScript {
             // Otherwise enable prayer in fight radius
             if (PPlayer.getWorldLocation().distanceTo2DHypotenuse(settings.getSearchRadiusCenter()) <= settings.getSearchRadius()+12){
                 if (PVars.getVarbit(Varbits.QUICK_PRAYER) == 0){
-                    prayerFlickExecutor.submit(() -> {
+                    prayerExecutor.submit(() -> {
                         PUtils.sleepNormal(100, 350);
                         Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                         PInteraction.widget(quickPray, "Activate");
                     });
                 }
             } else if (PVars.getVarbit(Varbits.QUICK_PRAYER) == 1){
-                prayerFlickExecutor.submit(() -> {
+                prayerExecutor.submit(() -> {
                     PUtils.sleepNormal(100, 350);
                     Widget quickPray = PWidgets.get(WidgetInfo.MINIMAP_QUICK_PRAYER_ORB);
                     PInteraction.widget(quickPray, "Deactivate");
@@ -349,8 +349,8 @@ public class PFighterAIO extends PScript {
         settings.setFlickQuickPrayers(config.flickQuickPrayers());
         settings.setAssistFlickPrayers(config.assistFlickPrayers());
         settings.setNormalQuickPrayers(config.normalQuickPrayers());
-        if (settings.isFlickQuickPrayers() || settings.isAssistFlickPrayers()) {
-            if (prayerFlickExecutor == null) prayerFlickExecutor = Executors.newSingleThreadExecutor();
+        if (settings.isFlickQuickPrayers() || settings.isAssistFlickPrayers() || settings.isNormalQuickPrayers()) {
+            if (prayerExecutor == null) prayerExecutor = Executors.newSingleThreadExecutor();
         }
 
         // Cannoning
