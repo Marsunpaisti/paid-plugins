@@ -367,7 +367,7 @@ public class PFighterAIO extends PScript {
             settings.setSearchRadiusCenter(config.storedFightTile());
         }
 
-        if (settings.getSafeSpot() == null && config.storedFightTile() != null && config.storedSafeSpotTile().distanceTo2D(settings.getSearchRadiusCenter()) < 50) {
+        if (settings.getSafeSpot() == null && config.storedSafeSpotTile() != null && config.storedSafeSpotTile().distanceTo2D(settings.getSearchRadiusCenter()) < 50) {
             settings.setSafeSpot(config.storedSafeSpotTile());
             usingSavedSafeSpot = true;
         }
